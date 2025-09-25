@@ -1,0 +1,30 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Ticket Actualizado{% endblock %}
+
+{% block content %}
+<h2>Ticket Actualizado</h2>
+
+<p>Hola {{ user.get_full_name|default:user.username }},</p>
+
+<p>El ticket <strong>{{ ticket.title }}</strong> ha sido actualizado por {{ updated_by.get_full_name|default:updated_by.username }}.</p>
+
+<div class="ticket-info">
+    <h3>{{ ticket.title }}</h3>
+    <p><strong>ID:</strong> #{{ ticket.id }}</p>
+    <p><strong>Estado:</strong> 
+        <span class="status-badge status-{{ ticket.status|lower }}">{{ ticket.get_status_display }}</span>
+    </p>
+    <p><strong>Prioridad:</strong> 
+        <span class="priority-{{ ticket.priority|lower }}">{{ ticket.get_priority_display }}</span>
+    </p>
+    <p><strong>Actualizado por:</strong> {{ updated_by.get_full_name|default:updated_by.username }}</p>
+    <p><strong>Fecha de actualización:</strong> {{ ticket.updated_at|date:"d/m/Y H:i" }}</p>
+</div>
+
+<a href="{{ request.build_absolute_uri }}/tickets/{{ ticket.id }}/" class="button">
+    Ver Ticket
+</a>
+
+<p>Gracias por tu atención.</p>
+{% endblock %}

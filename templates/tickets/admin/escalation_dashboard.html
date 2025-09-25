@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+
+{% block title %}Administración de Escalamiento - Helpdesk{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+  <!-- Header -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          <i class="fas fa-level-up-alt mr-3"></i>
+          Administración de Escalamiento
+        </h1>
+        <p class="text-gray-600">Panel de control para gestión de escalamientos automáticos</p>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row gap-4">
+        <a href="{% url 'tickets:admin_escalation_rules' %}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-cogs mr-2"></i>Reglas
+        </a>
+        <a href="{% url 'tickets:admin_escalation_settings' %}" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+          <i class="fas fa-sliders-h mr-2"></i>Configuración
+        </a>
+        <a href="{% url 'tickets:admin_escalation_reports' %}" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+          <i class="fas fa-chart-bar mr-2"></i>Reportes
+        </a>
+        <!-- Agregando enlace a pruebas de email -->
+        <a href="{% url 'tickets:admin_email_test' %}" class="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
+          <i class="fas fa-envelope-open-text mr-2"></i>Pruebas Email
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Total Escalamientos</p>
+          <p class="text-3xl font-bold text-purple-600">{{ total_escalations }}</p>
+        </div>
+        <i class="fas fa-level-up-alt text-purple-500 text-2xl"></i>
+      </div>
+    </div>
+    
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Últimos 30 días</p>
+          <p class="text-3xl font-bold text-blue-600">{{ escalations_last_30_days }}</p>
+        </div>
+        <i class="fas fa-calendar-alt text-blue-500 text-2xl"></i>
+      </div>
+    </div>
+    
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Tickets Escalados Activos</p>
+          <p class="text-3xl font-bold text-orange-600">{{ active_tickets_with_escalation }}</p>
+        </div>
+        <i class="fas fa-exclamation-triangle text-orange-500 text-2xl"></i>
+      </div>
+    </div>
+    
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Escalamientos Pausados</p>
+          <p class="text-3xl font-bold text-gray-600">{{ paused_escalations }}</p>
+        </div>
+        <i class="fas fa-pause-circle text-gray-500 text-2xl"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Próximos Escalamientos -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <h3 class="text-xl font-bold text-gray-800 mb-6">
+      <i class="fas fa-clock mr-2 text-yellow-500"></i>
+      Próximos Escalamientos (24 horas)
+    </h3>
+    
+    {% if upcoming_escalations %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Ticket</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Empresa</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Prioridad</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Nivel Actual</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Próximo Escalamiento</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in upcoming_escalations %}
+          <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="py-3 px-4">
+              <a href="{% url 'tickets:ticket_detail' ticket.pk %}" class="text-blue-600 hover:text-blue-800 font-medium">
+                {{ ticket.reference }}
+              </a>
+              <div class="text-sm text-gray-500">{{ ticket.title|truncatechars:50 }}</div>
+            </td>
+            <td class="py-3 px-4">{{ ticket.company.name|default:"N/A" }}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 rounded-full text-xs font-medium
+                {% if ticket.priority == 'CRITICAL' %}bg-red-100 text-red-800
+                {% elif ticket.priority == 'HIGH' %}bg-orange-100 text-orange-800
+                {% elif ticket.priority == 'MEDIUM' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-green-100 text-green-800{% endif %}">
+                {{ ticket.get_priority_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                Nivel {{ ticket.escalation_level }}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <div class="text-sm">{{ ticket.next_escalation_at|date:"d/m/Y H:i" }}</div>
+              <div class="text-xs text-gray-500">{{ ticket.next_escalation_at|timeuntil }}</div>
+            </td>
+            <td class="py-3 px-4">
+              <div class="flex space-x-2">
+                <button onclick="pauseEscalation({{ ticket.pk }})" class="text-yellow-600 hover:text-yellow-800" title="Pausar">
+                  <i class="fas fa-pause"></i>
+                </button>
+                <a href="{% url 'tickets:ticket_detail' ticket.pk %}" class="text-blue-600 hover:text-blue-800" title="Ver">
+                  <i class="fas fa-eye"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-gray-500">
+      <i class="fas fa-clock text-4xl mb-4"></i>
+      <p>No hay escalamientos programados para las próximas 24 horas</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Estadísticas por Empresa -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <h3 class="text-xl font-bold text-gray-800 mb-6">
+      <i class="fas fa-building mr-2 text-blue-500"></i>
+      Escalamientos por Empresa (Top 10)
+    </h3>
+    
+    {% if company_stats %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Empresa</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Total Escalamientos</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Últimos 30 días</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Nivel Promedio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for company in company_stats %}
+          <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="py-3 px-4 font-medium">{{ company.name }}</td>
+            <td class="py-3 px-4">{{ company.total_escalations }}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                {{ company.recent_escalations }}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              {% if company.avg_escalation_level %}
+                {{ company.avg_escalation_level|floatformat:1 }}
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-gray-500">
+      <i class="fas fa-building text-4xl mb-4"></i>
+      <p>No hay datos de escalamiento por empresa</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Logs Recientes -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xl font-bold text-gray-800">
+        <i class="fas fa-history mr-2 text-green-500"></i>
+        Actividad Reciente
+      </h3>
+      <a href="{% url 'tickets:admin_escalation_reports' %}" class="text-blue-600 hover:text-blue-800">
+        Ver todos <i class="fas fa-arrow-right ml-1"></i>
+      </a>
+    </div>
+    
+    {% if escalation_logs %}
+    <div class="space-y-4">
+      {% for log in escalation_logs|slice:":10" %}
+      <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+        <div class="flex items-center space-x-4">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center
+            {% if log.action == 'escalated' %}bg-red-100 text-red-600
+            {% elif log.action == 'paused' %}bg-yellow-100 text-yellow-600
+            {% elif log.action == 'resumed' %}bg-green-100 text-green-600
+            {% else %}bg-gray-100 text-gray-600{% endif %}">
+            <i class="fas 
+              {% if log.action == 'escalated' %}fa-level-up-alt
+              {% elif log.action == 'paused' %}fa-pause
+              {% elif log.action == 'resumed' %}fa-play
+              {% else %}fa-cog{% endif %}"></i>
+          </div>
+          <div>
+            <div class="font-medium">
+              Ticket {{ log.ticket.reference }} - {{ log.get_action_display }}
+            </div>
+            <div class="text-sm text-gray-500">
+              {% if log.from_user and log.to_user %}
+                De {{ log.from_user.username }} a {{ log.to_user.username }}
+              {% elif log.to_user %}
+                Asignado a {{ log.to_user.username }}
+              {% endif %}
+              • Nivel {{ log.level }}
+            </div>
+          </div>
+        </div>
+        <div class="text-sm text-gray-500">
+          {{ log.created_at|timesince }} ago
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-gray-500">
+      <i class="fas fa-history text-4xl mb-4"></i>
+      <p>No hay actividad de escalamiento reciente</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function pauseEscalation(ticketId) {
+  if (confirm('¿Estás seguro de que quieres pausar el escalamiento de este ticket?')) {
+    fetch(`/tickets/${ticketId}/escalation/pause/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        'Content-Type': 'application/json',
+      },
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        location.reload();
+      } else {
+        alert('Error al pausar el escalamiento');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error al pausar el escalamiento');
+    });
+  }
+}
+
+// Auto-refresh stats every 5 minutes
+setInterval(() => {
+  fetch('/tickets/admin/escalation/stats/')
+    .then(response => response.json())
+    .then(data => {
+      // Update stats without full page reload
+      console.log('Stats updated:', data);
+    })
+    .catch(error => console.error('Error updating stats:', error));
+}, 300000);
+</script>
+{% endblock %}

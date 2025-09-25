@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Reemplazando el diseño básico con tarjetas modernas y gradientes -->
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    
+    <!-- Hero Section -->
+    <div class="text-center mb-16">
+      <h1 class="text-4xl md:text-6xl font-bold text-gray-900 mb-6 text-balance">
+        Bienvenido al Sistema de 
+        <span class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          Helpdesk
+        </span>
+      </h1>
+      <p class="text-xl text-gray-600 max-w-3xl mx-auto text-pretty">
+        Gestiona tickets de soporte, consulta estadísticas y mantén un seguimiento eficiente de todas las solicitudes de ayuda.
+      </p>
+    </div>
+
+    <!-- Action Cards -->
+    <div class="grid md:grid-cols-2 gap-8 mb-16">
+      <!-- Dashboard Card -->
+      <a href="/dashboard/" class="group block">
+        <div class="bg-white/70 backdrop-blur-sm border border-white/20 rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+          <div class="flex items-center mb-6">
+            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">
+              <i class="fas fa-chart-dashboard"></i>
+            </div>
+            <div class="ml-4">
+              <h3 class="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                Dashboard
+              </h3>
+              <p class="text-gray-600">Panel de control</p>
+            </div>
+          </div>
+          <p class="text-gray-700 mb-4">
+            Visualiza estadísticas en tiempo real y obtén una vista general del estado de todos los tickets.
+          </p>
+          <div class="flex items-center text-blue-600 font-semibold group-hover:text-blue-700">
+            Ir al Dashboard
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+          </div>
+        </div>
+      </a>
+
+      <!-- Tickets Card -->
+      <a href="/tickets/" class="group block">
+        <div class="bg-white/70 backdrop-blur-sm border border-white/20 rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+          <div class="flex items-center mb-6">
+            <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">
+              <i class="fas fa-ticket-alt"></i>
+            </div>
+            <div class="ml-4">
+              <h3 class="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
+                Mis Tickets
+              </h3>
+              <p class="text-gray-600">Gestión de solicitudes</p>
+            </div>
+          </div>
+          <p class="text-gray-700 mb-4">
+            Crea, edita y gestiona tickets de soporte de manera eficiente con nuestro sistema intuitivo.
+          </p>
+          <div class="flex items-center text-green-600 font-semibold group-hover:text-green-700">
+            Ver Mis Tickets
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="bg-white/50 backdrop-blur-sm border border-white/20 rounded-2xl p-8 shadow-lg">
+      <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">
+        ¿Listo para comenzar?
+      </h3>
+      <p class="text-gray-600 text-center mb-8 max-w-2xl mx-auto">
+        Accede al sistema para gestionar tickets y consultar estadísticas.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/dashboard/" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl text-center">
+          <i class="fas fa-chart-line mr-2"></i>
+          Ir al Dashboard
+        </a>
+        <a href="/tickets/" class="bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl border border-gray-200 text-center">
+          <i class="fas fa-list mr-2"></i>
+          Ver Tickets
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

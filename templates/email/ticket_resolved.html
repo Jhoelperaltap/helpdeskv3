@@ -1,0 +1,29 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Ticket Resuelto{% endblock %}
+
+{% block content %}
+<h2>¡Ticket Resuelto! ✅</h2>
+
+<p>Hola {{ user.get_full_name|default:user.username }},</p>
+
+<p>Nos complace informarte que tu ticket ha sido resuelto:</p>
+
+<div class="ticket-info">
+    <h3>{{ ticket.title }}</h3>
+    <p><strong>ID:</strong> #{{ ticket.id }}</p>
+    <p><strong>Estado:</strong> 
+        <span class="status-badge status-resolved">Resuelto</span>
+    </p>
+    <p><strong>Resuelto por:</strong> {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username }}</p>
+    <p><strong>Fecha de resolución:</strong> {{ ticket.updated_at|date:"d/m/Y H:i" }}</p>
+</div>
+
+<a href="{{ request.build_absolute_uri }}/tickets/{{ ticket.id }}/" class="button">
+    Ver Detalles del Ticket
+</a>
+
+<p>Si tienes alguna pregunta adicional o el problema persiste, no dudes en contactarnos.</p>
+
+<p>¡Gracias por usar nuestro sistema de soporte!</p>
+{% endblock %}

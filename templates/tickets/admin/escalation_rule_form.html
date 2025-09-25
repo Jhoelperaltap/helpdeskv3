@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  {% if object %}Editar Regla{% else %}Nueva Regla{% endif %} - Escalamiento - Helpdesk
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+   Header 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          <i class="fas fa-cog mr-3"></i>
+          {% if object %}Editar Regla de Escalamiento{% else %}Nueva Regla de Escalamiento{% endif %}
+        </h1>
+        <p class="text-gray-600">
+          {% if object %}Modificar regla existente{% else %}Crear nueva regla de escalamiento automático{% endif %}
+        </p>
+      </div>
+      
+      <a href="{% url 'tickets:admin_escalation_rules' %}" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+        <i class="fas fa-arrow-left mr-2"></i>Volver a Reglas
+      </a>
+    </div>
+  </div>
+
+   Formulario 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <form method="post" class="space-y-6">
+      {% csrf_token %}
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+         Empresa 
+        <div>
+          <label for="{{ form.company.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+            Empresa
+          </label>
+          {{ form.company }}
+          {% if form.company.help_text %}
+            <p class="mt-1 text-sm text-gray-500">{{ form.company.help_text }}</p>
+          {% endif %}
+          {% if form.company.errors %}
+            <div class="mt-1 text-sm text-red-600">
+              {% for error in form.company.errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+         Prioridad 
+        <div>
+          <label for="{{ form.priority.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+            Prioridad <span class="text-red-500">*</span>
+          </label>
+          {{ form.priority }}
+          {% if form.priority.help_text %}
+            <p class="mt-1 text-sm text-gray-500">{{ form.priority.help_text }}</p>
+          {% endif %}
+          {% if form.priority.errors %}
+            <div class="mt-1 text-sm text-red-600">
+              {% for error in form.priority.errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+         Nivel 
+        <div>
+          <label for="{{ form.level.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+            Nivel de Escalamiento <span class="text-red-500">*</span>
+          </label>
+          {{ form.level }}
+          {% if form.level.help_text %}
+            <p class="mt-1 text-sm text-gray-500">{{ form.level.help_text }}</p>
+          {% endif %}
+          {% if form.level.errors %}
+            <div class="mt-1 text-sm text-red-600">
+              {% for error in form.level.errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+         Horas para escalar 
+        <div>
+          <label for="{{ form.hours_to_escalate.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+            Horas para Escalar <span class="text-red-500">*</span>
+          </label>
+          {{ form.hours_to_escalate }}
+          {% if form.hours_to_escalate.help_text %}
+            <p class="mt-1 text-sm text-gray-500">{{ form.hours_to_escalate.help_text }}</p>
+          {% endif %}
+          {% if form.hours_to_escalate.errors %}
+            <div class="mt-1 text-sm text-red-600">
+              {% for error in form.hours_to_escalate.errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+       Escalar a 
+      <div>
+        <label for="{{ form.escalate_to.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+          Escalar a <span class="text-red-500">*</span>
+        </label>
+        {{ form.escalate_to }}
+        {% if form.escalate_to.help_text %}
+          <p class="mt-1 text-sm text-gray-500">{{ form.escalate_to.help_text }}</p>
+        {% endif %}
+        {% if form.escalate_to.errors %}
+          <div class="mt-1 text-sm text-red-600">
+            {% for error in form.escalate_to.errors %}
+              <p>{{ error }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+       Template de notificación 
+      <div>
+        <label for="{{ form.notification_template.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+          Plantilla de Notificación
+        </label>
+        {{ form.notification_template }}
+        {% if form.notification_template.help_text %}
+          <p class="mt-1 text-sm text-gray-500">{{ form.notification_template.help_text }}</p>
+        {% endif %}
+        {% if form.notification_template.errors %}
+          <div class="mt-1 text-sm text-red-600">
+            {% for error in form.notification_template.errors %}
+              <p>{{ error }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+       Estado activo 
+      <div class="flex items-center">
+        {{ form.is_active }}
+        <label for="{{ form.is_active.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
+          Regla activa
+        </label>
+        {% if form.is_active.help_text %}
+          <p class="ml-2 text-sm text-gray-500">{{ form.is_active.help_text }}</p>
+        {% endif %}
+        {% if form.is_active.errors %}
+          <div class="ml-2 text-sm text-red-600">
+            {% for error in form.is_active.errors %}
+              <p>{{ error }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+       Botones 
+      <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+        <a href="{% url 'tickets:admin_escalation_rules' %}" class="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors">
+          Cancelar
+        </a>
+        <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-save mr-2"></i>
+          {% if object %}Actualizar Regla{% else %}Crear Regla{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+
+   Información adicional 
+  <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+    <h3 class="text-lg font-semibold text-blue-800 mb-4">
+      <i class="fas fa-info-circle mr-2"></i>
+      Información sobre Reglas de Escalamiento
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-700">
+      <div>
+        <h4 class="font-semibold mb-2">Empresa:</h4>
+        <p>Si no seleccionas una empresa, la regla se aplicará a todas las empresas (regla global).</p>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2">Nivel:</h4>
+        <p>El nivel 1 es el primer escalamiento, nivel 2 el segundo, etc. Debe ser único por empresa/prioridad.</p>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2">Horas:</h4>
+        <p>Tiempo sin respuesta antes de activar esta regla. Puedes usar decimales (ej: 0.5 = 30 minutos).</p>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2">Plantilla:</h4>
+        <p>Mensaje personalizado para notificaciones. Si está vacío, se usa la plantilla por defecto.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

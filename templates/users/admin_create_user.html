@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Crear Usuario - E&J TI{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-8">
+    <div class="container mx-auto px-4">
+        <div class="max-w-2xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-white mb-2">
+                    <i class="fas fa-user-plus mr-3 text-blue-400"></i>
+                    Crear Nuevo Usuario
+                </h1>
+                <p class="text-gray-300">Administración de usuarios del sistema</p>
+            </div>
+
+            <!-- Form Card -->
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 p-8 shadow-2xl">
+                <form method="post" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                        <div class="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6">
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-triangle text-red-400 mr-2"></i>
+                                <span class="text-red-200 font-medium">Por favor corrige los errores:</span>
+                            </div>
+                            <ul class="mt-2 text-red-200 text-sm">
+                                {% for field, errors in form.errors.items %}
+                                    {% for error in errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Username -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-user mr-2 text-blue-400"></i>
+                                Nombre de Usuario
+                            </label>
+                            {{ form.username }}
+                        </div>
+
+                        <!-- Email -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-envelope mr-2 text-blue-400"></i>
+                                Email
+                            </label>
+                            {{ form.email }}
+                        </div>
+
+                        <!-- First Name -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-id-card mr-2 text-blue-400"></i>
+                                Nombre
+                            </label>
+                            {{ form.first_name }}
+                        </div>
+
+                        <!-- Last Name -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-id-card mr-2 text-blue-400"></i>
+                                Apellido
+                            </label>
+                            {{ form.last_name }}
+                        </div>
+
+                        <!-- Role -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-user-tag mr-2 text-blue-400"></i>
+                                Rol
+                            </label>
+                            {{ form.role }}
+                        </div>
+
+                        <!-- Company -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-building mr-2 text-blue-400"></i>
+                                Empresa
+                            </label>
+                            {{ form.company }}
+                            <p class="text-gray-400 text-sm mt-1">{{ form.company.help_text }}</p>
+                        </div>
+
+                        <!-- Password -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-lock mr-2 text-blue-400"></i>
+                                Contraseña
+                            </label>
+                            {{ form.password1 }}
+                        </div>
+
+                        <!-- Confirm Password -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">
+                                <i class="fas fa-lock mr-2 text-blue-400"></i>
+                                Confirmar Contraseña
+                            </label>
+                            {{ form.password2 }}
+                        </div>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex flex-col sm:flex-row gap-4 pt-6">
+                        <button type="submit" class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
+                            <i class="fas fa-save mr-2"></i>
+                            Crear Usuario
+                        </button>
+                        <a href="{% url 'users:admin_user_list' %}" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 text-center">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-control {
+    @apply w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm;
+}
+</style>
+{% endblock %}

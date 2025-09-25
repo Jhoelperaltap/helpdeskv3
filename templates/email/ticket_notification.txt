@@ -1,0 +1,31 @@
+{{ site_name|default:"Sistema Helpdesk" }}
+Notificación de Ticket
+
+Hola {{ user_name }},
+
+{{ notification_message|default:"Se ha actualizado un ticket que requiere tu atención." }}
+
+INFORMACIÓN DEL TICKET:
+=======================
+Título: {{ ticket.title }}
+Número: {{ ticket.reference|default:ticket.id }}
+Estado: {{ ticket.get_status_display }}
+Prioridad: {{ ticket.get_priority_display }}
+{% if ticket.company %}Empresa: {{ ticket.company.name }}{% endif %}
+{% if ticket.assigned_to %}Asignado a: {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username }}{% endif %}
+Creado: {{ ticket.created_at|date:"d/m/Y H:i" }}
+{% if ticket.escalation_level > 0 %}Nivel de Escalamiento: {{ ticket.escalation_level }}{% endif %}
+
+{% if ticket_url %}
+Ver ticket completo: {{ ticket_url }}
+{% endif %}
+
+{% if additional_message %}
+MENSAJE ADICIONAL:
+{{ additional_message }}
+{% endif %}
+
+---
+Este es un mensaje automático del {{ site_name|default:"Sistema Helpdesk" }}.
+Por favor, no respondas a este email.
+{% if support_email %}Para soporte, contacta: {{ support_email }}{% endif %}

@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width,initial-scale=1'>
+    <title>{% block title %}Helpdesk v3{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                50: '#eff6ff',
+                500: '#3b82f6',
+                600: '#2563eb',
+                700: '#1d4ed8',
+              }
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body class='bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen'>
+    <!-- Agregando token CSRF para formularios AJAX -->
+    {% csrf_token %}
+    
+    <!-- Header mejorado -->
+    <header class='bg-white/80 backdrop-blur-md shadow-lg border-b border-blue-100 sticky top-0 z-50'>
+      <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+        <div class='flex items-center justify-between h-16'>
+          <!-- Logo y título -->
+          <div class='flex items-center space-x-3'>
+            <div class='bg-gradient-to-r from-blue-500 to-blue-600 p-2 rounded-lg'>
+              <i class='fas fa-headset text-white text-xl'></i>
+            </div>
+            <div>
+              <h1 class='text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent'>
+                Helpdesk
+              </h1>
+              <p class='text-xs text-gray-500'>Sistema de Soporte v3</p>
+            </div>
+          </div>
+          
+          <!-- Navegación -->
+          <nav class='hidden md:flex items-center space-x-1'>
+            {% if user.is_authenticated %}
+              <a href='/dashboard/' class='flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 group'>
+                <i class='fas fa-chart-line group-hover:scale-110 transition-transform'></i>
+                <span class='font-medium'>Dashboard</span>
+              </a>
+              <a href='/tickets/' class='flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 group'>
+                <i class='fas fa-ticket-alt group-hover:scale-110 transition-transform'></i>
+                <span class='font-medium'>Tickets</span>
+              </a>
+              <a href='/notifications/' class='flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 group relative'>
+                <i class='fas fa-bell group-hover:scale-110 transition-transform'></i>
+                <span class='font-medium'>Notificaciones</span>
+                <!-- Added notification badge for unread count -->
+                <span id="notification-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+              </a>
+              
+              <!-- Added admin menu for SUPERADMIN users -->
+              {% if user.role == 'SUPERADMIN' %}
+                <div class='relative group'>
+                  <button class='flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all duration-200 group'>
+                    <i class='fas fa-cog group-hover:scale-110 transition-transform'></i>
+                    <span class='font-medium'>Administración</span>
+                    <i class='fas fa-chevron-down text-xs'></i>
+                  </button>
+                  <div class='absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50'>
+                    <div class='py-2'>
+                      <a href='{% url "users:admin_create_user" %}' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600'>
+                        <i class='fas fa-user-plus w-4'></i>
+                        <span>Crear Usuario</span>
+                      </a>
+                      <a href='{% url "users:admin_user_list" %}' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600'>
+                        <i class='fas fa-users w-4'></i>
+                        <span>Gestionar Usuarios</span>
+                      </a>
+                      <div class='border-t border-gray-100 my-1'></div>
+                      <a href='{% url "tickets:admin_escalation_dashboard" %}' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600'>
+                        <i class='fas fa-level-up-alt w-4'></i>
+                        <span>Escalamiento</span>
+                      </a>
+                      <div class='border-t border-gray-100 my-1'></div>
+                      <a href='/admin/' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600'>
+                        <i class='fas fa-database w-4'></i>
+                        <span>Panel Django Admin</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              <!-- Added user info and logout button for authenticated users -->
+              <div class='flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200'>
+                <div class='flex items-center space-x-2'>
+                  <div class='w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center'>
+                    <i class='fas fa-user text-white text-sm'></i>
+                  </div>
+                  <span class='text-sm font-medium text-gray-700'>{{ user.get_full_name|default:user.username }}</span>
+                </div>
+                <a href='{% url "users:logout" %}' class='flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg'>
+                  <i class='fas fa-sign-out-alt'></i>
+                  <span class='font-medium'>Cerrar Sesión</span>
+                </a>
+              </div>
+            {% else %}
+              <!-- Show login and register buttons for non-authenticated users -->
+              <a href='/users/login/' class='flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg'>
+                <i class='fas fa-sign-in-alt'></i>
+                <span class='font-medium'>Iniciar Sesión</span>
+              </a>
+            {% endif %}
+          </nav>
+
+          <!-- Menú móvil -->
+          <div class='md:hidden'>
+            <button id='mobile-menu-button' class='p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500'>
+              <i class='fas fa-bars text-xl'></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Menú móvil desplegable -->
+        <div id='mobile-menu' class='hidden md:hidden pb-4'>
+          <div class='space-y-2'>
+            {% if user.is_authenticated %}
+              <!-- Mobile menu for authenticated users -->
+              <div class='px-4 py-3 bg-blue-50 rounded-lg mb-3'>
+                <div class='flex items-center space-x-2'>
+                  <div class='w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center'>
+                    <i class='fas fa-user text-white text-sm'></i>
+                  </div>
+                  <div>
+                    <span class='text-sm font-medium text-gray-700'>{{ user.get_full_name|default:user.username }}</span>
+                    <!-- Added role display in mobile menu -->
+                    <div class='text-xs text-gray-500'>{{ user.get_role_display }}</div>
+                  </div>
+                </div>
+              </div>
+              <a href='/dashboard/' class='flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200'>
+                <i class='fas fa-chart-line w-5'></i>
+                <span>Dashboard</span>
+              </a>
+              <a href='/tickets/' class='flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200'>
+                <i class='fas fa-ticket-alt w-5'></i>
+                <span>Tickets</span>
+              </a>
+              <a href='/notifications/' class='flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 relative'>
+                <i class='fas fa-bell w-5'></i>
+                <span>Notificaciones</span>
+                <!-- Added mobile notification badge -->
+                <span id="notification-badge-mobile" class="absolute top-2 left-8 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center hidden">0</span>
+              </a>
+              
+              <!-- Added admin options in mobile menu for SUPERADMIN -->
+              {% if user.role == 'SUPERADMIN' %}
+                <div class='border-t border-gray-200 pt-2 mt-2'>
+                  <div class='px-4 py-2 text-xs font-semibold text-purple-600 uppercase tracking-wide'>Administración</div>
+                  <a href='{% url "users:admin_create_user" %}' class='flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all duration-200'>
+                    <i class='fas fa-user-plus w-5'></i>
+                    <span>Crear Usuario</span>
+                  </a>
+                  <a href='{% url "users:admin_user_list" %}' class='flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all duration-200'>
+                    <i class='fas fa-users w-5'></i>
+                    <span>Gestionar Usuarios</span>
+                  </a>
+                  <a href='{% url "tickets:admin_escalation_dashboard" %}' class='flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all duration-200'>
+                    <i class='fas fa-level-up-alt w-5'></i>
+                    <span>Escalamiento</span>
+                  </a>
+                  <a href='/admin/' class='flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all duration-200'>
+                    <i class='fas fa-database w-5'></i>
+                    <span>Panel Django Admin</span>
+                  </a>
+                </div>
+              {% endif %}
+              
+              <a href='{% url "users:logout" %}' class='flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg'>
+                <i class='fas fa-sign-out-alt w-5'></i>
+                <span>Cerrar Sesión</span>
+              </a>
+            {% else %}
+              <!-- Mobile menu for non-authenticated users -->
+              <a href='/users/login/' class='flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg'>
+                <i class='fas fa-sign-in-alt w-5'></i>
+                <span>Iniciar Sesión</span>
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+      <div class='bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 min-h-[60vh]'>
+        <div class='p-6 sm:p-8'>
+          {% block content %}
+          <!-- Contenido por defecto si no hay bloque -->
+          <div class='text-center py-12'>
+            <div class='bg-gradient-to-r from-blue-500 to-blue-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6'>
+              <i class='fas fa-headset text-white text-3xl'></i>
+            </div>
+            <h2 class='text-3xl font-bold text-gray-900 mb-4'>Bienvenido al Sistema Helpdesk</h2>
+            <p class='text-gray-600 text-lg max-w-2xl mx-auto'>
+              Gestiona tickets de soporte, monitorea el rendimiento del equipo y brinda la mejor experiencia de atención al cliente.
+            </p>
+            <div class='mt-8 flex flex-col sm:flex-row gap-4 justify-center'>
+              <a href='/tickets/' class='inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg'>
+                <i class='fas fa-plus mr-2'></i>
+                Crear Ticket
+              </a>
+              <a href='/dashboard/' class='inline-flex items-center px-6 py-3 border-2 border-blue-500 text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-all duration-200'>
+                <i class='fas fa-chart-line mr-2'></i>
+                Ver Dashboard
+              </a>
+            </div>
+          </div>
+          {% endblock %}
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class='mt-12 bg-white/50 backdrop-blur-sm border-t border-gray-200'>
+      <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
+        <div class='flex flex-col md:flex-row justify-between items-center'>
+          <div class='flex items-center space-x-2 mb-4 md:mb-0'>
+            <div class='bg-gradient-to-r from-blue-500 to-blue-600 p-1 rounded'>
+              <i class='fas fa-headset text-white text-sm'></i>
+            </div>
+            <span class='text-gray-600 font-medium'>Helpdesk v3</span>
+          </div>
+          <div class='text-sm text-gray-500'>
+            © 2024 Sistema de Soporte. Todos los derechos reservados.
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- JavaScript para menú móvil -->
+    <script>
+      document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        const mobileMenu = document.getElementById('mobile-menu');
+        const icon = this.querySelector('i');
+        
+        if (mobileMenu.classList.contains('hidden')) {
+          mobileMenu.classList.remove('hidden');
+          icon.classList.remove('fa-bars');
+          icon.classList.add('fa-times');
+        } else {
+          mobileMenu.classList.add('hidden');
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        }
+      });
+
+      {% if user.is_authenticated %}
+      let notificationSocket = null;
+      
+      function initializeWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
+        
+        notificationSocket = new WebSocket(wsUrl);
+        
+        notificationSocket.onopen = function(e) {
+          console.log('[v0] WebSocket connection established');
+        };
+        
+        notificationSocket.onmessage = function(e) {
+          const data = JSON.parse(e.data);
+          console.log('[v0] Received notification:', data);
+          
+          if (data.type === 'unread_count') {
+            updateNotificationBadge(data.count);
+          } else if (data.message_type === 'new_notification') {
+            updateNotificationBadge(data.unread_count);
+            showNotificationToast(data.notification);
+          }
+        };
+        
+        notificationSocket.onclose = function(e) {
+          console.log('[v0] WebSocket connection closed');
+          // Attempt to reconnect after 3 seconds
+          setTimeout(initializeWebSocket, 3000);
+        };
+        
+        notificationSocket.onerror = function(e) {
+          console.error('[v0] WebSocket error:', e);
+        };
+      }
+      
+      function updateNotificationBadge(count) {
+        const badge = document.getElementById('notification-badge');
+        const badgeMobile = document.getElementById('notification-badge-mobile');
+        
+        if (count > 0) {
+          badge.textContent = count > 99 ? '99+' : count;
+          badge.classList.remove('hidden');
+          badgeMobile.textContent = count > 99 ? '99+' : count;
+          badgeMobile.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+          badgeMobile.classList.add('hidden');
+        }
+      }
+      
+      function showNotificationToast(notification) {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-white border-l-4 border-blue-500 rounded-lg shadow-lg p-4 max-w-sm z-50 transform translate-x-full transition-transform duration-300';
+        
+        const iconClass = getNotificationIcon(notification.notification_type);
+        
+        toast.innerHTML = `
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <i class="${iconClass} text-blue-500"></i>
+            </div>
+            <div class="ml-3 flex-1">
+              <p class="text-sm font-medium text-gray-900">${notification.verb}</p>
+              ${notification.description ? `<p class="text-sm text-gray-500 mt-1">${notification.description}</p>` : ''}
+              <p class="text-xs text-gray-400 mt-1">Ahora</p>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-400 hover:text-gray-600">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+          toast.classList.remove('translate-x-full');
+        }, 100);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+          toast.classList.add('translate-x-full');
+          setTimeout(() => toast.remove(), 300);
+        }, 5000);
+      }
+      
+      function getNotificationIcon(type) {
+        const icons = {
+          'ticket_created': 'fas fa-ticket-alt',
+          'ticket_assigned': 'fas fa-user-tag',
+          'ticket_updated': 'fas fa-edit',
+          'ticket_closed': 'fas fa-check-circle',
+          'ticket_reopened': 'fas fa-redo',
+          'comment_added': 'fas fa-comment',
+          'system': 'fas fa-cog'
+        };
+        return icons[type] || 'fas fa-bell';
+      }
+      
+      // Initialize WebSocket connection
+      initializeWebSocket();
+      {% endif %}
+
+      // Session timeout management
+      let sessionTimeoutWarning = null;
+      let sessionTimeoutLogout = null;
+      let warningModal = null;
+      
+      // Session configuration from Django
+      const SESSION_TIMEOUT = {{ settings.SESSION_COOKIE_AGE|default:1800 }} * 1000; // Convert to milliseconds
+      const WARNING_TIME = {{ settings.SESSION_TIMEOUT_WARNING|default:300 }} * 1000; // Convert to milliseconds
+      
+      function createWarningModal() {
+        // Create modal HTML
+        const modalHTML = `
+          <div id="session-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+              <div class="flex items-center mb-4">
+                <div class="bg-yellow-100 p-2 rounded-full mr-3">
+                  <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900">Sesión por Expirar</h3>
+              </div>
+              <p class="text-gray-600 mb-6">
+                Tu sesión expirará en <span id="countdown-timer" class="font-bold text-red-600">5:00</span> minutos por inactividad.
+              </p>
+              <div class="flex space-x-3">
+                <button id="extend-session" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                  <i class="fas fa-refresh mr-2"></i>
+                  Extender Sesión
+                </button>
+                <button id="logout-now" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors">
+                  <i class="fas fa-sign-out-alt mr-2"></i>
+                  Cerrar Sesión
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        warningModal = document.getElementById('session-warning-modal');
+        
+        // Add event listeners
+        document.getElementById('extend-session').addEventListener('click', extendSession);
+        document.getElementById('logout-now').addEventListener('click', logoutNow);
+      }
+      
+      function showWarningModal() {
+        if (!warningModal) {
+          createWarningModal();
+        }
+        
+        warningModal.classList.remove('hidden');
+        startCountdown();
+      }
+      
+      function hideWarningModal() {
+        if (warningModal) {
+          warningModal.classList.add('hidden');
+        }
+      }
+      
+      function startCountdown() {
+        let timeLeft = WARNING_TIME / 1000; // Convert to seconds
+        const countdownElement = document.getElementById('countdown-timer');
+        
+        const countdownInterval = setInterval(() => {
+          const minutes = Math.floor(timeLeft / 60);
+          const seconds = timeLeft % 60;
+          countdownElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+          
+          if (timeLeft <= 0) {
+            clearInterval(countdownInterval);
+            logoutNow();
+          }
+          
+          timeLeft--;
+        }, 1000);
+        
+        // Store interval to clear it if session is extended
+        warningModal.countdownInterval = countdownInterval;
+      }
+      
+      function extendSession() {
+        // Make a request to extend the session
+        fetch(window.location.href, {
+          method: 'GET',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        }).then(() => {
+          hideWarningModal();
+          resetSessionTimers();
+          
+          // Clear countdown if it exists
+          if (warningModal && warningModal.countdownInterval) {
+            clearInterval(warningModal.countdownInterval);
+          }
+          
+          // Show success message
+          showNotification('Sesión extendida exitosamente', 'success');
+        }).catch(() => {
+          showNotification('Error al extender la sesión', 'error');
+        });
+      }
+      
+      function logoutNow() {
+        window.location.href = '{% url "users:logout" %}';
+      }
+      
+      function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+          type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+        }`;
+        notification.innerHTML = `
+          <div class="flex items-center">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+            ${message}
+          </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          notification.remove();
+        }, 3000);
+      }
+      
+      function resetSessionTimers() {
+        // Clear existing timers
+        if (sessionTimeoutWarning) {
+          clearTimeout(sessionTimeoutWarning);
+        }
+        if (sessionTimeoutLogout) {
+          clearTimeout(sessionTimeoutLogout);
+        }
+        
+        // Set new timers
+        sessionTimeoutWarning = setTimeout(showWarningModal, SESSION_TIMEOUT - WARNING_TIME);
+        sessionTimeoutLogout = setTimeout(logoutNow, SESSION_TIMEOUT);
+      }
+      
+      // Initialize session timers
+      resetSessionTimers();
+      
+      // Reset timers on user activity
+      let activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      let activityTimer = null;
+      
+      function resetActivityTimer() {
+        if (activityTimer) {
+          clearTimeout(activityTimer);
+        }
+        
+        activityTimer = setTimeout(() => {
+          resetSessionTimers();
+        }, 1000); // Debounce activity detection
+      }
+      
+      // Add activity listeners
+      activityEvents.forEach(event => {
+        document.addEventListener(event, resetActivityTimer, true);
+      });
+    </script>
+  </body>
+</html>

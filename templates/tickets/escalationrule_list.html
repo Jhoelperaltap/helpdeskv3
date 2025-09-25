@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Reglas de Escalamiento{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-900">Reglas de Escalamiento</h1>
+                <a href="{% url 'tickets:admin_escalation_rule_create' %}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Nueva Regla
+                </a>
+            </div>
+        </div>
+
+         Redirigir al template correcto 
+        <div class="p-6">
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center">
+                    <i class="fas fa-info-circle text-yellow-600 mr-2"></i>
+                    <p class="text-yellow-800">
+                        Redirigiendo al panel de administración de escalamiento...
+                    </p>
+                </div>
+            </div>
+            
+            <script>
+                // Redirigir automáticamente al template correcto
+                window.location.href = "{% url 'tickets:admin_escalation_rules' %}";
+            </script>
+            
+            <div class="text-center">
+                <p class="text-gray-600 mb-4">Si no eres redirigido automáticamente, haz clic en el enlace:</p>
+                <a href="{% url 'tickets:admin_escalation_rules' %}" 
+                   class="text-blue-600 hover:text-blue-800 underline">
+                    Ir a Reglas de Escalamiento
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

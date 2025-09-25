@@ -1,0 +1,449 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Header mejorado con gradiente y mejor espaciado -->
+<div class="bg-gradient-to-r from-blue-50 to-indigo-50 backdrop-blur-sm border border-white/20 rounded-2xl p-6 mb-8 shadow-lg">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div>
+      <h2 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <i class="fas fa-ticket-alt mr-3"></i>Gestión de Tickets
+      </h2>
+      <p class="text-gray-600 mt-1">Administra y da seguimiento a todas las solicitudes de soporte</p>
+    </div>
+    <a href="{% url 'tickets:ticket_create' %}" 
+       class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+      <i class="fas fa-plus mr-2"></i>
+      Crear Ticket
+    </a>
+  </div>
+</div>
+
+<!-- Panel de Filtros Avanzados -->
+<div class="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl p-6 mb-8 shadow-lg">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-lg font-semibold text-gray-800">
+      <i class="fas fa-filter mr-2 text-blue-600"></i>
+      Filtros Avanzados
+    </h3>
+    <div class="flex items-center gap-2">
+      {% if has_active_filters %}
+        <a href="{% url 'tickets:clear_filters' %}" 
+           class="inline-flex items-center px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200">
+          <i class="fas fa-times mr-1"></i>
+          Limpiar
+        </a>
+      {% endif %}
+      <button onclick="toggleFilters()" 
+              class="inline-flex items-center px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors duration-200">
+        <i class="fas fa-chevron-down mr-1" id="filter-toggle-icon"></i>
+        <span id="filter-toggle-text">Mostrar</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filtros Guardados -->
+  {% if saved_filters %}
+  <div class="mb-4">
+    <h4 class="text-sm font-medium text-gray-700 mb-2">Filtros Guardados:</h4>
+    <div class="flex flex-wrap gap-2">
+      {% for saved_filter in saved_filters %}
+        <div class="flex items-center bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg px-3 py-2">
+          <a href="{% url 'tickets:load_filter' saved_filter.id %}" 
+             class="text-sm text-green-700 hover:text-green-800 font-medium">
+            {% if saved_filter.is_default %}<i class="fas fa-star mr-1"></i>{% endif %}
+            {{ saved_filter.name }}
+          </a>
+          <form method="post" action="{% url 'tickets:delete_filter' saved_filter.id %}" class="ml-2">
+            {% csrf_token %}
+            <button type="submit" 
+                    onclick="return confirm('¿Eliminar este filtro?')"
+                    class="text-red-500 hover:text-red-700 text-xs">
+              <i class="fas fa-times"></i>
+            </button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Formulario de Filtros -->
+  <div id="filter-form" class="hidden">
+    <form method="get" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        <!-- Búsqueda -->
+        <div class="lg:col-span-3">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-search mr-1"></i>Búsqueda
+          </label>
+          {{ filter.form.search }}
+        </div>
+
+        <!-- Estado -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-flag mr-1"></i>Estado
+          </label>
+          <div class="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-3">
+            {% for choice in filter.form.status %}
+              <div class="flex items-center">
+                {{ choice.tag }}
+                <label for="{{ choice.id_for_label }}" class="ml-2 text-sm text-gray-700">
+                  {{ choice.choice_label }}
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Prioridad -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-exclamation-triangle mr-1"></i>Prioridad
+          </label>
+          <div class="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-3">
+            {% for choice in filter.form.priority %}
+              <div class="flex items-center">
+                {{ choice.tag }}
+                <label for="{{ choice.id_for_label }}" class="ml-2 text-sm text-gray-700">
+                  {{ choice.choice_label }}
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Empresa (si está disponible) -->
+        {% if filter.form.company %}
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-building mr-1"></i>Empresa
+          </label>
+          {{ filter.form.company }}
+        </div>
+        {% endif %}
+
+        <!-- Asignado a -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-user mr-1"></i>Asignado a
+          </label>
+          {{ filter.form.assigned_to }}
+        </div>
+
+        <!-- Fecha de creación -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-calendar mr-1"></i>Fecha de Creación
+          </label>
+          <div class="flex gap-2">
+            {{ filter.form.created_at.0 }}
+            <span class="self-center text-gray-500">a</span>
+            {{ filter.form.created_at.1 }}
+          </div>
+        </div>
+
+        <!-- Fecha de actualización -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-clock mr-1"></i>Última Actualización
+          </label>
+          <div class="flex gap-2">
+            {{ filter.form.updated_at.0 }}
+            <span class="self-center text-gray-500">a</span>
+            {{ filter.form.updated_at.1 }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="flex flex-col sm:flex-row gap-4 pt-4 border-t border-gray-200">
+        <div class="flex gap-2">
+          <button type="submit" 
+                  class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+            <i class="fas fa-search mr-2"></i>
+            Aplicar Filtros
+          </button>
+          <a href="{% url 'tickets:clear_filters' %}" 
+             class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors duration-200">
+            <i class="fas fa-times mr-2"></i>
+            Limpiar
+          </a>
+        </div>
+
+        <!-- Guardar filtro -->
+        {% if has_active_filters %}
+        <div class="flex items-center gap-2 sm:ml-auto">
+          <input type="text" 
+                 name="filter_name" 
+                 placeholder="Nombre del filtro..." 
+                 class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+          <label class="flex items-center text-sm text-gray-700">
+            <input type="checkbox" name="is_default" class="mr-1">
+            Por defecto
+          </label>
+          <button type="submit" 
+                  formaction="{% url 'tickets:save_filter' %}" 
+                  formmethod="post"
+                  class="inline-flex items-center px-3 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors duration-200">
+            <i class="fas fa-save mr-1"></i>
+            Guardar
+          </button>
+        </div>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Estadísticas mejoradas -->
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+  <div class="bg-gradient-to-br from-blue-50 to-indigo-50 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-lg">
+    <div class="flex items-center">
+      <div class="p-3 bg-blue-100 rounded-lg">
+        <i class="fas fa-list text-blue-600 text-xl"></i>
+      </div>
+      <div class="ml-4">
+        <p class="text-sm font-medium text-gray-600">Total</p>
+        <p class="text-2xl font-bold text-blue-600">{{ total_count }}</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="bg-gradient-to-br from-green-50 to-emerald-50 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-lg">
+    <div class="flex items-center">
+      <div class="p-3 bg-green-100 rounded-lg">
+        <i class="fas fa-folder-open text-green-600 text-xl"></i>
+      </div>
+      <div class="ml-4">
+        <p class="text-sm font-medium text-gray-600">Abiertos</p>
+        <p class="text-2xl font-bold text-green-600">{{ open_count }}</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="bg-gradient-to-br from-yellow-50 to-amber-50 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-lg">
+    <div class="flex items-center">
+      <div class="p-3 bg-yellow-100 rounded-lg">
+        <i class="fas fa-spinner text-yellow-600 text-xl"></i>
+      </div>
+      <div class="ml-4">
+        <p class="text-sm font-medium text-gray-600">En Progreso</p>
+        <p class="text-2xl font-bold text-yellow-600">{{ in_progress_count }}</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="bg-gradient-to-br from-emerald-50 to-green-50 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-lg">
+    <div class="flex items-center">
+      <div class="p-3 bg-emerald-100 rounded-lg">
+        <i class="fas fa-check-circle text-emerald-600 text-xl"></i>
+      </div>
+      <div class="ml-4">
+        <p class="text-sm font-medium text-gray-600">Resueltos</p>
+        <p class="text-2xl font-bold text-emerald-600">{{ resolved_count }}</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="bg-gradient-to-br from-gray-50 to-slate-50 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-lg">
+    <div class="flex items-center">
+      <div class="p-3 bg-gray-100 rounded-lg">
+        <i class="fas fa-times-circle text-gray-600 text-xl"></i>
+      </div>
+      <div class="ml-4">
+        <p class="text-sm font-medium text-gray-600">Cerrados</p>
+        <p class="text-2xl font-bold text-gray-600">{{ closed_count }}</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="bg-gradient-to-br from-red-50 to-rose-50 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-lg">
+    <div class="flex items-center">
+      <div class="p-3 bg-red-100 rounded-lg">
+        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+      </div>
+      <div class="ml-4">
+        <p class="text-sm font-medium text-gray-600">Alta Prioridad</p>
+        <p class="text-2xl font-bold text-red-600">{{ high_priority_count }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lista de tickets mejorada con diseño moderno -->
+<div class="space-y-4">
+  {% for ticket in object_list %}
+    <div class="bg-gradient-to-r from-white/80 to-gray-50/80 backdrop-blur-sm border border-white/20 rounded-xl p-6 shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 group">
+      <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <!-- Información principal del ticket -->
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors duration-200">
+              <i class="fas fa-ticket-alt text-blue-600"></i>
+            </div>
+            <div>
+              <a href="{{ ticket.get_absolute_url }}" 
+                 class="text-lg font-bold text-gray-800 hover:text-blue-600 transition-colors duration-200">
+                {{ ticket.reference }} - {{ ticket.title }}
+              </a>
+              <div class="flex items-center gap-4 mt-1">
+                <span class="text-sm text-gray-600">
+                  <i class="fas fa-building mr-1"></i>
+                  {{ ticket.company }}
+                </span>
+                <span class="text-sm text-gray-500">
+                  <i class="fas fa-calendar mr-1"></i>
+                  {{ ticket.created_at|date:"d/m/Y H:i" }}
+                </span>
+                {% if ticket.assigned_to %}
+                <span class="text-sm text-gray-500">
+                  <i class="fas fa-user mr-1"></i>
+                  {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username }}
+                </span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Estado y prioridad -->
+        <div class="flex items-center gap-3">
+          <!-- Prioridad -->
+          {% if ticket.priority == 'HIGH' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              <i class="fas fa-exclamation-triangle mr-1"></i>
+              Alta
+            </span>
+          {% elif ticket.priority == 'MEDIUM' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              <i class="fas fa-minus mr-1"></i>
+              Media
+            </span>
+          {% else %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <i class="fas fa-arrow-down mr-1"></i>
+              Baja
+            </span>
+          {% endif %}
+          
+          <!-- Estado -->
+          {% if ticket.status == 'OPEN' %}
+            <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+              <i class="fas fa-folder-open mr-2"></i>
+              Abierto
+            </span>
+          {% elif ticket.status == 'IN_PROGRESS' %}
+            <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+              <i class="fas fa-spinner mr-2"></i>
+              En Progreso
+            </span>
+          {% elif ticket.status == 'RESOLVED' %}
+            <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <i class="fas fa-check-circle mr-2"></i>
+              Resuelto
+            </span>
+          {% else %}
+            <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+              <i class="fas fa-times-circle mr-2"></i>
+              Cerrado
+            </span>
+          {% endif %}
+          
+          <!-- Botón de acción -->
+          <a href="{{ ticket.get_absolute_url }}" 
+             class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+            <i class="fas fa-eye mr-2"></i>
+            Ver
+          </a>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <!-- Estado vacío mejorado -->
+    <div class="text-center py-16">
+      <div class="bg-gradient-to-br from-gray-50 to-blue-50 backdrop-blur-sm border border-white/20 rounded-2xl p-12 shadow-lg max-w-md mx-auto">
+        <div class="p-4 bg-blue-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+          <i class="fas fa-ticket-alt text-blue-600 text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">No hay tickets disponibles</h3>
+        <p class="text-gray-600 mb-6">
+          {% if has_active_filters %}
+            No se encontraron tickets que coincidan con los filtros aplicados.
+          {% else %}
+            Comienza creando tu primer ticket de soporte.
+          {% endif %}
+        </p>
+        {% if has_active_filters %}
+          <a href="{% url 'tickets:clear_filters' %}" 
+             class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gray-600 to-slate-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 mr-3">
+            <i class="fas fa-times mr-2"></i>
+            Limpiar Filtros
+          </a>
+        {% endif %}
+        <a href="{% url 'tickets:ticket_create' %}" 
+           class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+          <i class="fas fa-plus mr-2"></i>
+          Crear Ticket
+        </a>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Paginación mejorada -->
+{% if is_paginated %}
+<div class="flex justify-center mt-8">
+  <nav class="bg-white/80 backdrop-blur-sm border border-white/20 rounded-xl p-2 shadow-lg">
+    <div class="flex items-center space-x-1">
+      {% if page_obj.has_previous %}
+        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+           class="px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg hover:bg-gray-50 transition-colors duration-200">
+          <i class="fas fa-chevron-left"></i>
+        </a>
+      {% endif %}
+      
+      <span class="px-4 py-2 text-sm font-medium text-gray-700">
+        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+      </span>
+      
+      {% if page_obj.has_next %}
+        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+           class="px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg hover:bg-gray-50 transition-colors duration-200">
+          <i class="fas fa-chevron-right"></i>
+        </a>
+      {% endif %}
+    </div>
+  </nav>
+</div>
+{% endif %}
+
+<script>
+function toggleFilters() {
+  const filterForm = document.getElementById('filter-form');
+  const toggleIcon = document.getElementById('filter-toggle-icon');
+  const toggleText = document.getElementById('filter-toggle-text');
+  
+  if (filterForm.classList.contains('hidden')) {
+    filterForm.classList.remove('hidden');
+    toggleIcon.classList.remove('fa-chevron-down');
+    toggleIcon.classList.add('fa-chevron-up');
+    toggleText.textContent = 'Ocultar';
+  } else {
+    filterForm.classList.add('hidden');
+    toggleIcon.classList.remove('fa-chevron-up');
+    toggleIcon.classList.add('fa-chevron-down');
+    toggleText.textContent = 'Mostrar';
+  }
+}
+
+// Mostrar filtros automáticamente si hay filtros activos
+{% if has_active_filters %}
+document.addEventListener('DOMContentLoaded', function() {
+  toggleFilters();
+});
+{% endif %}
+</script>
+
+{% endblock %}

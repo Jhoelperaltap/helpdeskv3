@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notificación de Ticket - {{ site_name }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .ticket-info {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .ticket-info h3 {
+            margin-top: 0;
+            color: #495057;
+            font-size: 18px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #6c757d;
+        }
+        .info-value {
+            color: #495057;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-open { background: #fff3cd; color: #856404; }
+        .status-in-progress { background: #d1ecf1; color: #0c5460; }
+        .status-resolved { background: #d4edda; color: #155724; }
+        .status-closed { background: #f8d7da; color: #721c24; }
+        .priority-critical { background: #f8d7da; color: #721c24; }
+        .priority-high { background: #fff3cd; color: #856404; }
+        .priority-medium { background: #d1ecf1; color: #0c5460; }
+        .priority-low { background: #d4edda; color: #155724; }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            .info-row {
+                flex-direction: column;
+            }
+            .info-label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ site_name|default:"Sistema Helpdesk" }}</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Notificación de Ticket</p>
+        </div>
+        
+        <div class="content">
+            <p>Hola <strong>{{ user_name }}</strong>,</p>
+            
+            <p>{{ notification_message|default:"Se ha actualizado un ticket que requiere tu atención." }}</p>
+            
+            <div class="ticket-info">
+                <h3>{{ ticket.title }}</h3>
+                
+                <div class="info-row">
+                    <span class="info-label">Número de Ticket:</span>
+                    <span class="info-value"><strong>{{ ticket.reference|default:ticket.id }}</strong></span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="info-label">Estado:</span>
+                    <span class="info-value">
+                        <span class="status-badge status-{{ ticket.status|lower }}">
+                            {{ ticket.get_status_display }}
+                        </span>
+                    </span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="info-label">Prioridad:</span>
+                    <span class="info-value">
+                        <span class="status-badge priority-{{ ticket.priority|lower }}">
+                            {{ ticket.get_priority_display }}
+                        </span>
+                    </span>
+                </div>
+                
+                {% if ticket.company %}
+                <div class="info-row">
+                    <span class="info-label">Empresa:</span>
+                    <span class="info-value">{{ ticket.company.name }}</span>
+                </div>
+                {% endif %}
+                
+                {% if ticket.assigned_to %}
+                <div class="info-row">
+                    <span class="info-label">Asignado a:</span>
+                    <span class="info-value">{{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username }}</span>
+                </div>
+                {% endif %}
+                
+                <div class="info-row">
+                    <span class="info-label">Creado:</span>
+                    <span class="info-value">{{ ticket.created_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                
+                {% if ticket.escalation_level > 0 %}
+                <div class="info-row">
+                    <span class="info-label">Nivel de Escalamiento:</span>
+                    <span class="info-value">
+                        <span class="status-badge priority-high">Nivel {{ ticket.escalation_level }}</span>
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if ticket_url %}
+            <div style="text-align: center;">
+                <a href="{{ ticket_url }}" class="button">Ver Ticket Completo</a>
+            </div>
+            {% endif %}
+            
+            {% if additional_message %}
+            <div style="background: #e7f3ff; border: 1px solid #b3d9ff; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                <p style="margin: 0; color: #0066cc;">
+                    <strong>Mensaje adicional:</strong><br>
+                    {{ additional_message }}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="footer">
+            <p>Este es un mensaje automático del {{ site_name|default:"Sistema Helpdesk" }}.</p>
+            <p>Por favor, no respondas a este email.</p>
+            {% if support_email %}
+            <p>Para soporte, contacta: <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

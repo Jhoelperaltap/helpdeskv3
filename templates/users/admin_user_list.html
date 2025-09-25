@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Usuarios - E&J TI{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-8">
+    <div class="container mx-auto px-4">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8">
+            <div>
+                <h1 class="text-4xl font-bold text-white mb-2">
+                    <i class="fas fa-users mr-3 text-blue-400"></i>
+                    Gestión de Usuarios
+                </h1>
+                <p class="text-gray-300">Administra todos los usuarios del sistema</p>
+            </div>
+            <a href="{% url 'users:admin_create_user' %}" class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
+                <i class="fas fa-plus mr-2"></i>
+                Crear Usuario
+            </a>
+        </div>
+
+        <!-- Users Table -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 overflow-hidden shadow-2xl">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-white/5">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-white font-semibold">
+                                <i class="fas fa-user mr-2 text-blue-400"></i>
+                                Usuario
+                            </th>
+                            <th class="px-6 py-4 text-left text-white font-semibold">
+                                <i class="fas fa-envelope mr-2 text-blue-400"></i>
+                                Email
+                            </th>
+                            <th class="px-6 py-4 text-left text-white font-semibold">
+                                <i class="fas fa-user-tag mr-2 text-blue-400"></i>
+                                Rol
+                            </th>
+                            <th class="px-6 py-4 text-left text-white font-semibold">
+                                <i class="fas fa-building mr-2 text-blue-400"></i>
+                                Empresa
+                            </th>
+                            <th class="px-6 py-4 text-left text-white font-semibold">
+                                <i class="fas fa-calendar mr-2 text-blue-400"></i>
+                                Fecha Registro
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/10">
+                        {% for user in users %}
+                        <tr class="hover:bg-white/5 transition-colors duration-200">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mr-3">
+                                        <span class="text-white font-bold">{{ user.first_name|first }}{{ user.last_name|first }}</span>
+                                    </div>
+                                    <div>
+                                        <div class="text-white font-medium">{{ user.get_full_name|default:user.username }}</div>
+                                        <div class="text-gray-400 text-sm">@{{ user.username }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-gray-300">{{ user.email }}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-3 py-1 rounded-full text-sm font-medium
+                                    {% if user.role == 'SUPERADMIN' %}bg-red-500/20 text-red-300
+                                    {% elif user.role == 'TECHNICIAN' %}bg-green-500/20 text-green-300
+                                    {% elif user.role == 'COMPANY_ADMIN' %}bg-blue-500/20 text-blue-300
+                                    {% else %}bg-gray-500/20 text-gray-300{% endif %}">
+                                    {{ user.get_role_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-300">
+                                {% if user.company %}
+                                    {{ user.company.name }}
+                                {% else %}
+                                    <span class="text-gray-500">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-gray-300">{{ user.date_joined|date:"d/m/Y" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-400">
+                                <i class="fas fa-users text-4xl mb-4 block"></i>
+                                No hay usuarios registrados
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="flex justify-center mt-8">
+            <nav class="flex space-x-2">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                {% endif %}
+                
+                <span class="px-4 py-2 bg-blue-600 text-white rounded-lg">
+                    {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                </span>
+                
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

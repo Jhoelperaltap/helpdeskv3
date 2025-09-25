@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+
+{% block title %}Reglas de Escalamiento - Helpdesk{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+   Header 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          <i class="fas fa-cogs mr-3"></i>
+          Reglas de Escalamiento
+        </h1>
+        <p class="text-gray-600">Configurar reglas automáticas de escalamiento por empresa y prioridad</p>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row gap-4">
+        <a href="{% url 'tickets:admin_escalation_dashboard' %}" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+          <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
+        </a>
+        <a href="{% url 'tickets:admin_escalation_rule_create' %}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-plus mr-2"></i>Nueva Regla
+        </a>
+      </div>
+    </div>
+  </div>
+
+   Filtros 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Empresa</label>
+        <select name="company" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="">Todas las empresas</option>
+          {% for company in companies %}
+          <option value="{{ company.id }}" {% if current_filters.company == company.id|stringformat:"s" %}selected{% endif %}>
+            {{ company.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Prioridad</label>
+        <select name="priority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="">Todas las prioridades</option>
+          {% for priority_key, priority_label in priorities %}
+          <option value="{{ priority_key }}" {% if current_filters.priority == priority_key %}selected{% endif %}>
+            {{ priority_label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+        <select name="is_active" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="">Todos</option>
+          <option value="true" {% if current_filters.is_active == "true" %}selected{% endif %}>Activas</option>
+          <option value="false" {% if current_filters.is_active == "false" %}selected{% endif %}>Inactivas</option>
+        </select>
+      </div>
+      
+      <div class="flex items-end">
+        <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-search mr-2"></i>Filtrar
+        </button>
+      </div>
+    </form>
+  </div>
+
+   Lista de Reglas 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    {% if rules %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Empresa</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Prioridad</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Nivel</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Horas</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Escalar a</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Estado</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rule in rules %}
+          <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="py-3 px-4">
+              {% if rule.company %}
+                <span class="font-medium">{{ rule.company.name }}</span>
+              {% else %}
+                <span class="text-purple-600 font-medium">Global</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 rounded-full text-xs font-medium
+                {% if rule.priority == 'HIGH' %}bg-red-100 text-red-800
+                {% elif rule.priority == 'MEDIUM' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-green-100 text-green-800{% endif %}">
+                {{ rule.get_priority_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                Nivel {{ rule.level }}
+              </span>
+            </td>
+            <td class="py-3 px-4">{{ rule.hours_to_escalate }}h</td>
+            <td class="py-3 px-4">
+              <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                  <i class="fas fa-user text-gray-600 text-sm"></i>
+                </div>
+                <span>{{ rule.escalate_to.get_full_name|default:rule.escalate_to.username }}</span>
+              </div>
+            </td>
+            <td class="py-3 px-4">
+              <button onclick="toggleRule({{ rule.id }})" class="px-3 py-1 rounded-full text-xs font-medium transition-colors
+                {% if rule.is_active %}bg-green-100 text-green-800 hover:bg-green-200
+                {% else %}bg-red-100 text-red-800 hover:bg-red-200{% endif %}">
+                {% if rule.is_active %}Activa{% else %}Inactiva{% endif %}
+              </button>
+            </td>
+            <td class="py-3 px-4">
+              <div class="flex space-x-2">
+                <a href="{% url 'tickets:admin_escalation_rule_edit' rule.pk %}" class="text-blue-600 hover:text-blue-800" title="Editar">
+                  <i class="fas fa-edit"></i>
+                </a>
+                <button onclick="deleteRule({{ rule.id }}, '{{ rule }}')" class="text-red-600 hover:text-red-800" title="Eliminar">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+     Paginación 
+    {% if is_paginated %}
+    <div class="flex justify-center mt-8">
+      <nav class="flex space-x-2">
+        {% if page_obj.has_previous %}
+          <a href="?page=1" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Primera</a>
+          <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Anterior</a>
+        {% endif %}
+        
+        <span class="px-3 py-2 bg-blue-600 text-white rounded-lg">
+          {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+        </span>
+        
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Siguiente</a>
+          <a href="?page={{ page_obj.paginator.num_pages }}" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Última</a>
+        {% endif %}
+      </nav>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="text-center py-12 text-gray-500">
+      <i class="fas fa-cogs text-6xl mb-4"></i>
+      <h3 class="text-xl font-semibold mb-2">No hay reglas de escalamiento</h3>
+      <p class="mb-6">Crea tu primera regla para comenzar con el escalamiento automático</p>
+      <a href="{% url 'tickets:admin_escalation_rule_create' %}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <i class="fas fa-plus mr-2"></i>Crear Primera Regla
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function toggleRule(ruleId) {
+  fetch(`/tickets/admin/escalation/rules/${ruleId}/toggle/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Error al cambiar el estado de la regla');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error al cambiar el estado de la regla');
+  });
+}
+
+function deleteRule(ruleId, ruleName) {
+  if (confirm(`¿Estás seguro de que quieres eliminar la regla "${ruleName}"?`)) {
+    // Crear formulario temporal para DELETE
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/tickets/admin/escalation/rules/${ruleId}/delete/`;
+    
+    const csrfToken = document.createElement('input');
+    csrfToken.type = 'hidden';
+    csrfToken.name = 'csrfmiddlewaretoken';
+    csrfToken.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    form.appendChild(csrfToken);
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+</script>
+{% endblock %}

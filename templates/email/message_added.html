@@ -1,0 +1,28 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Nuevo Mensaje en Ticket{% endblock %}
+
+{% block content %}
+<h2>Nuevo Mensaje en Ticket</h2>
+
+<p>Hola {{ user.get_full_name|default:user.username }},</p>
+
+<p>{{ sender.get_full_name|default:sender.username }} ha agregado un nuevo mensaje al ticket:</p>
+
+<div class="ticket-info">
+    <h3>{{ ticket.title }}</h3>
+    <p><strong>ID:</strong> #{{ ticket.id }}</p>
+    <p><strong>De:</strong> {{ sender.get_full_name|default:sender.username }}</p>
+    <p><strong>Fecha:</strong> {{ message.created_at|date:"d/m/Y H:i" }}</p>
+    
+    <div style="background-color: white; padding: 15px; border-radius: 4px; margin-top: 15px; border-left: 3px solid #3b82f6;">
+        {{ message.content|linebreaks }}
+    </div>
+</div>
+
+<a href="{{ request.build_absolute_uri }}/tickets/{{ ticket.id }}/" class="button">
+    Ver Conversación Completa
+</a>
+
+<p>Gracias por tu atención.</p>
+{% endblock %}

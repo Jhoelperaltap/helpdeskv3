@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-md w-full space-y-8">
+    <!-- Header -->
+    <div class="text-center">
+      <div class="mx-auto h-12 w-12 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl flex items-center justify-center mb-4">
+        <i class="fas fa-user-plus text-white text-xl"></i>
+      </div>
+      <h2 class="text-3xl font-bold text-gray-900 mb-2">Crear cuenta</h2>
+      <p class="text-gray-600">Únete a nuestro sistema de soporte</p>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 p-8">
+      <form method="post" class="space-y-6">
+        {% csrf_token %}
+        
+        <!-- Custom form styling -->
+        <div class="space-y-4">
+          {% for field in form %}
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                {% if field.name == 'username' %}
+                  <i class="fas fa-user text-gray-400"></i>
+                {% elif field.name == 'email' %}
+                  <i class="fas fa-envelope text-gray-400"></i>
+                {% elif field.name == 'password1' or field.name == 'password2' %}
+                  <i class="fas fa-lock text-gray-400"></i>
+                {% elif field.name == 'first_name' %}
+                  <i class="fas fa-id-card text-gray-400"></i>
+                {% elif field.name == 'last_name' %}
+                  <i class="fas fa-id-badge text-gray-400"></i>
+                {% else %}
+                  <i class="fas fa-info-circle text-gray-400"></i>
+                {% endif %}
+              </div>
+              {{ field }}
+              {% if field.errors %}
+                <div class="mt-1 text-sm text-red-600">
+                  {% for error in field.errors %}
+                    <p>{{ error }}</p>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" 
+                class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transform transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl">
+          <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+            <i class="fas fa-user-plus group-hover:text-green-300 transition-colors duration-200"></i>
+          </span>
+          Crear cuenta
+        </button>
+      </form>
+
+      <!-- Login Link -->
+      <div class="mt-6 text-center">
+        <p class="text-sm text-gray-600">
+          ¿Ya tienes cuenta? 
+          <a href="{% url 'users:login' %}" 
+             class="font-medium text-green-600 hover:text-green-500 transition-colors duration-200">
+            Inicia sesión
+          </a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
+      <div class="flex items-start space-x-3">
+        <div class="flex-shrink-0">
+          <i class="fas fa-info-circle text-green-600 mt-0.5"></i>
+        </div>
+        <div class="text-sm text-green-700">
+          <p class="font-medium mb-1">Información importante:</p>
+          <ul class="space-y-1 text-green-600">
+            <li>• Tu cuenta será activada automáticamente</li>
+            <li>• Podrás crear y gestionar tickets de soporte</li>
+            <li>• Recibirás notificaciones por email</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Custom form field styling */
+.form-control, input[type="text"], input[type="email"], input[type="password"], select, textarea {
+  @apply w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm;
+}
+
+.form-control:focus, input:focus, select:focus, textarea:focus {
+  @apply shadow-lg transform scale-105;
+}
+
+/* Error styling */
+.errorlist {
+  @apply hidden;
+}
+</style>
+{% endblock %}

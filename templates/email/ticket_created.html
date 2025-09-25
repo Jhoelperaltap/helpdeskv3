@@ -1,0 +1,36 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Nuevo Ticket Creado{% endblock %}
+
+{% block content %}
+<h2>¡Nuevo Ticket Creado!</h2>
+
+<p>Hola {{ user.get_full_name|default:user.username }},</p>
+
+<p>Se ha creado un nuevo ticket que requiere tu atención:</p>
+
+<div class="ticket-info">
+    <h3>{{ ticket.title }}</h3>
+    <p><strong>ID:</strong> #{{ ticket.id }}</p>
+    <p><strong>Estado:</strong> 
+        <span class="status-badge status-{{ ticket.status|lower }}">{{ ticket.get_status_display }}</span>
+    </p>
+    <p><strong>Prioridad:</strong> 
+        <span class="priority-{{ ticket.priority|lower }}">{{ ticket.get_priority_display }}</span>
+    </p>
+    <p><strong>Creado por:</strong> {{ ticket.created_by.get_full_name|default:ticket.created_by.username }}</p>
+    <p><strong>Empresa:</strong> {{ ticket.company.name }}</p>
+    <p><strong>Fecha:</strong> {{ ticket.created_at|date:"d/m/Y H:i" }}</p>
+    
+    {% if ticket.description %}
+    <p><strong>Descripción:</strong></p>
+    <p>{{ ticket.description|linebreaks }}</p>
+    {% endif %}
+</div>
+
+<a href="{{ request.build_absolute_uri }}/tickets/{{ ticket.id }}/" class="button">
+    Ver Ticket
+</a>
+
+<p>Gracias por tu atención.</p>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuración de Escalamiento - Helpdesk{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+   Header 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          <i class="fas fa-sliders-h mr-3"></i>
+          Configuración de Escalamiento
+        </h1>
+        <p class="text-gray-600">Configurar parámetros globales del sistema de escalamiento</p>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row gap-4">
+        <a href="{% url 'tickets:admin_escalation_dashboard' %}" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+          <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
+        </a>
+        <a href="{% url 'tickets:admin_escalation_settings_create' %}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-plus mr-2"></i>Nueva Configuración
+        </a>
+      </div>
+    </div>
+  </div>
+
+   Lista de Configuraciones 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    {% if settings %}
+    <div class="space-y-6">
+      {% for setting in settings %}
+      <div class="border border-gray-200 rounded-lg p-6 {% if setting.enabled %}bg-green-50{% else %}bg-red-50{% endif %}">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">
+              {% if setting.company %}
+                <i class="fas fa-building mr-2 text-blue-500"></i>
+                {{ setting.company.name }}
+              {% else %}
+                <i class="fas fa-globe mr-2 text-purple-500"></i>
+                Configuración Global
+              {% endif %}
+            </h3>
+            <p class="text-sm text-gray-600 mt-1">
+              Estado: 
+              <span class="px-2 py-1 rounded-full text-xs font-medium
+                {% if setting.enabled %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                {% if setting.enabled %}Habilitado{% else %}Deshabilitado{% endif %}
+              </span>
+            </p>
+          </div>
+          
+          <div class="flex space-x-2">
+            <a href="{% url 'tickets:admin_escalation_settings_edit' setting.pk %}" class="text-blue-600 hover:text-blue-800" title="Editar">
+              <i class="fas fa-edit"></i>
+            </a>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <span class="font-medium text-gray-700">Horario Laboral:</span>
+            {% if setting.business_hours_only %}
+              <p class="text-gray-600">{{ setting.business_start_hour }}:00 - {{ setting.business_end_hour }}:00</p>
+              <p class="text-gray-500">
+                Días: 
+                {% for day in setting.get_business_days_list %}
+                  {% if day == 1 %}Lun{% elif day == 2 %}Mar{% elif day == 3 %}Mié{% elif day == 4 %}Jue{% elif day == 5 %}Vie{% elif day == 6 %}Sáb{% elif day == 7 %}Dom{% endif %}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              </p>
+            {% else %}
+              <p class="text-gray-600">24/7 (Sin restricción)</p>
+            {% endif %}
+          </div>
+          
+          <div>
+            <span class="font-medium text-gray-700">Configuración:</span>
+            <p class="text-gray-600">Nivel máximo: {{ setting.max_escalation_level }}</p>
+            <p class="text-gray-600">
+              {% if setting.auto_assign_on_escalation %}✓{% else %}✗{% endif %} Asignación automática
+            </p>
+            <p class="text-gray-600">
+              {% if setting.pause_on_response %}✓{% else %}✗{% endif %} Pausar al responder
+            </p>
+          </div>
+          
+          <div>
+            <span class="font-medium text-gray-700">Notificaciones:</span>
+            <p class="text-gray-600">
+              {% if setting.email_notifications %}✓ Habilitadas{% else %}✗ Deshabilitadas{% endif %}
+            </p>
+            <p class="text-gray-500 text-xs">Actualizado: {{ setting.updated_at|date:"d/m/Y H:i" }}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    
+    {% else %}
+    <div class="text-center py-12 text-gray-500">
+      <i class="fas fa-sliders-h text-6xl mb-4"></i>
+      <h3 class="text-xl font-semibold mb-2">No hay configuraciones</h3>
+      <p class="mb-6">Crea la primera configuración para el sistema de escalamiento</p>
+      <a href="{% url 'tickets:admin_escalation_settings_create' %}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <i class="fas fa-plus mr-2"></i>Crear Configuración
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

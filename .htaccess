@@ -1,0 +1,19 @@
+# Configuración Apache para Hostinger
+RewriteEngine On
+
+# Redirigir HTTP a HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Servir archivos estáticos directamente
+RewriteCond %{REQUEST_URI} ^/static/
+RewriteRule ^static/(.*)$ /staticfiles/$1 [L]
+
+# Servir archivos de media directamente
+RewriteCond %{REQUEST_URI} ^/media/
+RewriteRule ^media/(.*)$ /media/$1 [L]
+
+# Redirigir todo lo demás a Django
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ /passenger_wsgi.py/$1 [QSA,L]

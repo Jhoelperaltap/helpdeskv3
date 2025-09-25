@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Enhanced dashboard with advanced filtering and interactive charts -->
+<div class="space-y-8">
+  <!-- Header Section with Filters -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          Dashboard de Soporte
+        </h1>
+        <p class="text-gray-600">Análisis avanzado del sistema de tickets</p>
+      </div>
+      
+      <!-- Advanced filters section -->
+      <div class="flex flex-col sm:flex-row gap-4">
+        {% if user.role == 'SUPERADMIN' %}
+        <select id="companyFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="">Todas las empresas</option>
+          {% for company in companies %}
+          <option value="{{ company.id }}">{{ company.name }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        
+        <input type="date" id="dateFrom" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <input type="date" id="dateTo" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        
+        <button onclick="applyFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-filter mr-2"></i>Filtrar
+        </button>
+        
+        <button onclick="exportReport()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+          <i class="fas fa-download mr-2"></i>Exportar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Total Tickets</p>
+          <p id="totalTickets" class="text-3xl font-bold text-blue-600">{{ total_tickets }}</p>
+        </div>
+        <i class="fas fa-ticket-alt text-blue-500 text-2xl"></i>
+      </div>
+    </div>
+    
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Abiertos</p>
+          <p id="openTickets" class="text-3xl font-bold text-red-600">{{ open_tickets }}</p>
+        </div>
+        <i class="fas fa-exclamation-circle text-red-500 text-2xl"></i>
+      </div>
+    </div>
+    
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">En Progreso</p>
+          <p id="inProgressTickets" class="text-3xl font-bold text-yellow-600">{{ in_progress_tickets }}</p>
+        </div>
+        <i class="fas fa-clock text-yellow-500 text-2xl"></i>
+      </div>
+    </div>
+    
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 text-sm font-medium">Resueltos</p>
+          <p id="resolvedTickets" class="text-3xl font-bold text-green-600">{{ resolved_tickets }}</p>
+        </div>
+        <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Status Chart -->
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+      <h3 class="text-xl font-bold text-gray-800 mb-6">Tickets por Estado</h3>
+      <div class="relative h-64">
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>
+    
+    <!-- Priority Chart -->
+    <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+      <h3 class="text-xl font-bold text-gray-800 mb-6">Tickets por Prioridad</h3>
+      <div class="relative h-64">
+        <canvas id="priorityChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Technician Performance Section -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <h3 class="text-xl font-bold text-gray-800 mb-6">Rendimiento por Técnico</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Técnico</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Asignados</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Resueltos</th>
+            <th class="text-left py-3 px-4 font-semibold text-gray-700">Tasa de Resolución</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tech in technician_stats %}
+          <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="py-3 px-4">{{ tech.name }}</td>
+            <td class="py-3 px-4">{{ tech.total_assigned }}</td>
+            <td class="py-3 px-4">{{ tech.resolved }}</td>
+            <td class="py-3 px-4">
+              <div class="flex items-center">
+                <div class="w-16 bg-gray-200 rounded-full h-2 mr-3">
+                  <div class="bg-green-500 h-2 rounded-full" style="width: {{ tech.resolution_rate }}%"></div>
+                </div>
+                <span class="text-sm font-medium">{{ tech.resolution_rate }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Daily Tickets Trend Chart -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <h3 class="text-xl font-bold text-gray-800 mb-6">Tendencia de Tickets (Últimos 30 días)</h3>
+    <div class="relative h-64">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">Acciones Rápidas</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <a href="/tickets/create/" class="group bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl p-6 text-center transition-all duration-300 hover:scale-105 shadow-lg">
+        <i class="fas fa-plus-circle text-3xl mb-3 group-hover:scale-110 transition-transform"></i>
+        <h4 class="font-semibold text-lg">Crear Ticket</h4>
+        <p class="text-blue-100 text-sm mt-2">Nuevo ticket de soporte</p>
+      </a>
+      
+      <a href="/tickets/" class="group bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl p-6 text-center transition-all duration-300 hover:scale-105 shadow-lg">
+        <i class="fas fa-list text-3xl mb-3 group-hover:scale-110 transition-transform"></i>
+        <h4 class="font-semibold text-lg">Ver Tickets</h4>
+        <p class="text-purple-100 text-sm mt-2">Lista de todos los tickets</p>
+      </a>
+      
+      <a href="/notifications/" class="group bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl p-6 text-center transition-all duration-300 hover:scale-105 shadow-lg">
+        <i class="fas fa-bell text-3xl mb-3 group-hover:scale-110 transition-transform"></i>
+        <h4 class="font-semibold text-lg">Notificaciones</h4>
+        <p class="text-indigo-100 text-sm mt-2">Alertas y avisos</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Enhanced JavaScript with filtering and multiple charts -->
+<script>
+let statusChart, priorityChart, trendChart;
+
+// Initialize charts
+function initCharts() {
+  // Status Chart
+  const statusCtx = document.getElementById('statusChart').getContext('2d');
+  const byStatus = {{ by_status|safe }};
+  
+  statusChart = new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+      labels: byStatus.map(x => x.status),
+      datasets: [{
+        data: byStatus.map(x => x.count),
+        backgroundColor: [
+          'rgba(239, 68, 68, 0.8)',   // Red - OPEN
+          'rgba(245, 158, 11, 0.8)',  // Yellow - IN_PROGRESS
+          'rgba(34, 197, 94, 0.8)',   // Green - RESOLVED
+          'rgba(99, 102, 241, 0.8)'   // Indigo - CLOSED
+        ],
+        borderWidth: 2,
+        hoverOffset: 10
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+
+  // Priority Chart
+  const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+  const byPriority = {{ by_priority|safe }};
+  
+  priorityChart = new Chart(priorityCtx, {
+    type: 'bar',
+    data: {
+      labels: byPriority.map(x => x.priority),
+      datasets: [{
+        label: 'Tickets',
+        data: byPriority.map(x => x.count),
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.8)',   // Green - LOW
+          'rgba(245, 158, 11, 0.8)',  // Yellow - MEDIUM
+          'rgba(239, 68, 68, 0.8)'    // Red - HIGH
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  // Trend Chart
+  const trendCtx = document.getElementById('trendChart').getContext('2d');
+  const dailyTickets = {{ daily_tickets|safe }};
+  
+  trendChart = new Chart(trendCtx, {
+    type: 'line',
+    data: {
+      labels: dailyTickets.map(x => new Date(x.date).toLocaleDateString()),
+      datasets: [{
+        label: 'Tickets Creados',
+        data: dailyTickets.map(x => x.count),
+        borderColor: 'rgba(59, 130, 246, 1)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+// Apply filters function
+function applyFilters() {
+  const companyId = document.getElementById('companyFilter')?.value || '';
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+  
+  const params = new URLSearchParams();
+  if (companyId) params.append('company_id', companyId);
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+  
+  fetch(`/dashboard/api/data/?${params}`)
+    .then(response => response.json())
+    .then(data => {
+      // Update stats
+      document.getElementById('totalTickets').textContent = data.total_tickets;
+      document.getElementById('openTickets').textContent = data.open_tickets;
+      document.getElementById('inProgressTickets').textContent = data.in_progress_tickets;
+      document.getElementById('resolvedTickets').textContent = data.resolved_tickets;
+      
+      // Update charts
+      statusChart.data.labels = data.by_status.map(x => x.status);
+      statusChart.data.datasets[0].data = data.by_status.map(x => x.count);
+      statusChart.update();
+      
+      priorityChart.data.labels = data.by_priority.map(x => x.priority);
+      priorityChart.data.datasets[0].data = data.by_priority.map(x => x.count);
+      priorityChart.update();
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// Export report function
+function exportReport() {
+  const companyId = document.getElementById('companyFilter')?.value || '';
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+  
+  const params = new URLSearchParams();
+  params.append('format', 'csv');
+  if (companyId) params.append('company_id', companyId);
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+  
+  window.open(`/dashboard/export/?${params}`, '_blank');
+}
+
+// Initialize charts when page loads
+document.addEventListener('DOMContentLoaded', initCharts);
+</script>
+{% endblock %}

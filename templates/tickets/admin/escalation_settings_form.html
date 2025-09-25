@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  {% if object %}Editar Configuración{% else %}Nueva Configuración{% endif %} - Escalamiento - Helpdesk
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+   Header 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          <i class="fas fa-sliders-h mr-3"></i>
+          {% if object %}Editar Configuración{% else %}Nueva Configuración{% endif %}
+        </h1>
+        <p class="text-gray-600">
+          {% if object %}Modificar configuración existente{% else %}Crear nueva configuración de escalamiento{% endif %}
+        </p>
+      </div>
+      
+      <a href="{% url 'tickets:admin_escalation_settings' %}" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+        <i class="fas fa-arrow-left mr-2"></i>Volver a Configuraciones
+      </a>
+    </div>
+  </div>
+
+   Formulario 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <form method="post" class="space-y-8">
+      {% csrf_token %}
+      
+       Configuración General 
+      <div class="border-b border-gray-200 pb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Configuración General</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+           Empresa 
+          <div>
+            <label for="{{ form.company.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+              Empresa
+            </label>
+            {{ form.company }}
+            {% if form.company.help_text %}
+              <p class="mt-1 text-sm text-gray-500">{{ form.company.help_text }}</p>
+            {% endif %}
+            {% if form.company.errors %}
+              <div class="mt-1 text-sm text-red-600">
+                {% for error in form.company.errors %}
+                  <p>{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+           Habilitado 
+          <div class="flex items-center">
+            {{ form.enabled }}
+            <label for="{{ form.enabled.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
+              Sistema de escalamiento habilitado
+            </label>
+            {% if form.enabled.errors %}
+              <div class="ml-2 text-sm text-red-600">
+                {% for error in form.enabled.errors %}
+                  <p>{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+       Horario Laboral 
+      <div class="border-b border-gray-200 pb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Horario Laboral</h3>
+        
+        <div class="space-y-4">
+           Solo horario laboral 
+          <div class="flex items-center">
+            {{ form.business_hours_only }}
+            <label for="{{ form.business_hours_only.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
+              Solo escalar durante horario laboral
+            </label>
+            {% if form.business_hours_only.help_text %}
+              <p class="ml-2 text-sm text-gray-500">{{ form.business_hours_only.help_text }}</p>
+            {% endif %}
+          </div>
+
+          <div id="business-hours-config" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+             Hora inicio 
+            <div>
+              <label for="{{ form.business_start_hour.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Hora de Inicio
+              </label>
+              {{ form.business_start_hour }}
+              {% if form.business_start_hour.errors %}
+                <div class="mt-1 text-sm text-red-600">
+                  {% for error in form.business_start_hour.errors %}
+                    <p>{{ error }}</p>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+             Hora fin 
+            <div>
+              <label for="{{ form.business_end_hour.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                Hora de Fin
+              </label>
+              {{ form.business_end_hour }}
+              {% if form.business_end_hour.errors %}
+                <div class="mt-1 text-sm text-red-600">
+                  {% for error in form.business_end_hour.errors %}
+                    <p>{{ error }}</p>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+           Días laborales 
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Días Laborales
+            </label>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {% for choice in form.business_days %}
+                <div class="flex items-center">
+                  {{ choice.tag }}
+                  <label for="{{ choice.id_for_label }}" class="ml-2 text-sm text-gray-700">
+                    {{ choice.choice_label }}
+                  </label>
+                </div>
+              {% endfor %}
+            </div>
+            {% if form.business_days.help_text %}
+              <p class="mt-1 text-sm text-gray-500">{{ form.business_days.help_text }}</p>
+            {% endif %}
+            {% if form.business_days.errors %}
+              <div class="mt-1 text-sm text-red-600">
+                {% for error in form.business_days.errors %}
+                  <p>{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+       Configuración de Escalamiento 
+      <div class="border-b border-gray-200 pb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Configuración de Escalamiento</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+           Nivel máximo 
+          <div>
+            <label for="{{ form.max_escalation_level.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+              Nivel Máximo de Escalamiento <span class="text-red-500">*</span>
+            </label>
+            {{ form.max_escalation_level }}
+            {% if form.max_escalation_level.help_text %}
+              <p class="mt-1 text-sm text-gray-500">{{ form.max_escalation_level.help_text }}</p>
+            {% endif %}
+            {% if form.max_escalation_level.errors %}
+              <div class="mt-1 text-sm text-red-600">
+                {% for error in form.max_escalation_level.errors %}
+                  <p>{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+           Asignación automática 
+          <div class="flex items-center">
+            {{ form.auto_assign_on_escalation }}
+            <label for="{{ form.auto_assign_on_escalation.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
+              Asignar automáticamente al escalar
+            </label>
+            {% if form.auto_assign_on_escalation.help_text %}
+              <p class="ml-2 text-sm text-gray-500">{{ form.auto_assign_on_escalation.help_text }}</p>
+            {% endif %}
+          </div>
+
+           Pausar al responder 
+          <div class="flex items-center">
+            {{ form.pause_on_response }}
+            <label for="{{ form.pause_on_response.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
+              Pausar escalamiento al responder
+            </label>
+            {% if form.pause_on_response.help_text %}
+              <p class="ml-2 text-sm text-gray-500">{{ form.pause_on_response.help_text }}</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+       Notificaciones 
+      <div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Notificaciones</h3>
+        
+        <div class="flex items-center">
+          {{ form.email_notifications }}
+          <label for="{{ form.email_notifications.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
+            Enviar notificaciones por email
+          </label>
+          {% if form.email_notifications.errors %}
+            <div class="ml-2 text-sm text-red-600">
+              {% for error in form.email_notifications.errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+       Botones 
+      <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+        <a href="{% url 'tickets:admin_escalation_settings' %}" class="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors">
+          Cancelar
+        </a>
+        <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-save mr-2"></i>
+          {% if object %}Actualizar Configuración{% else %}Crear Configuración{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Mostrar/ocultar configuración de horario laboral
+document.addEventListener('DOMContentLoaded', function() {
+  const businessHoursCheckbox = document.getElementById('{{ form.business_hours_only.id_for_label }}');
+  const businessHoursConfig = document.getElementById('business-hours-config');
+  
+  function toggleBusinessHours() {
+    if (businessHoursCheckbox.checked) {
+      businessHoursConfig.style.display = 'grid';
+    } else {
+      businessHoursConfig.style.display = 'none';
+    }
+  }
+  
+  businessHoursCheckbox.addEventListener('change', toggleBusinessHours);
+  toggleBusinessHours(); // Ejecutar al cargar
+});
+</script>
+{% endblock %}

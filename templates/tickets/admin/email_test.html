@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Pruebas de Email - Administración{% endblock %}
+
+{% block extra_css %}
+<style>
+    .email-config-card {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .test-button {
+        margin: 5px;
+        min-width: 120px;
+    }
+    
+    .config-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .config-item:last-child {
+        border-bottom: none;
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-active { background-color: #28a745; }
+    .status-inactive { background-color: #dc3545; }
+    .status-warning { background-color: #ffc107; }
+    
+    /* Agregando estilos para el estado de conexión SMTP */
+    .connection-status {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid;
+    }
+    
+    .connection-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+    
+    .connection-error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+    
+    .connection-warning {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-envelope-open-text me-2"></i>
+                    Pruebas de Email
+                </h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'tickets:admin_escalation_dashboard' %}">Admin</a></li>
+                        <li class="breadcrumb-item active">Pruebas Email</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+     Agregando estado de conexión SMTP 
+    {% if smtp_connection_status %}
+    <div class="row mb-4">
+        <div class="col-12">
+            {% if smtp_connection_success %}
+            <div class="connection-status connection-success">
+                <h5><i class="fas fa-check-circle me-2"></i>Conexión SMTP Exitosa</h5>
+                <p class="mb-0">{{ smtp_connection_status.message }}</p>
+                <small>Host: {{ smtp_connection_status.details.host }}:{{ smtp_connection_status.details.port }} | Usuario: {{ smtp_connection_status.details.username }}</small>
+            </div>
+            {% else %}
+            <div class="connection-status connection-error">
+                <h5><i class="fas fa-exclamation-triangle me-2"></i>Error de Conexión SMTP</h5>
+                <p class="mb-2"><strong>Error:</strong> {{ smtp_connection_error }}</p>
+                {% if smtp_connection_status.suggestions %}
+                <p class="mb-0"><strong>Sugerencias:</strong></p>
+                <ul class="mb-0">
+                    {% for suggestion in smtp_connection_status.suggestions %}
+                    <li>{{ suggestion }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+     Configuración Actual 
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="email-config-card">
+                <h4 class="mb-3">
+                    <i class="fas fa-cog me-2"></i>
+                    Configuración Actual de Email
+                </h4>
+                
+                <div class="config-item">
+                    <span><strong>Backend:</strong></span>
+                    <span>
+                        <span class="status-indicator {% if 'console' in email_backend %}status-warning{% elif 'smtp' in email_backend %}status-active{% else %}status-inactive{% endif %}"></span>
+                        {{ email_backend }}
+                    </span>
+                </div>
+                
+                <div class="config-item">
+                    <span><strong>Host SMTP:</strong></span>
+                    <span>{{ email_host|default:"No configurado" }}</span>
+                </div>
+                
+                <div class="config-item">
+                    <span><strong>Puerto:</strong></span>
+                    <span>{{ email_port }}</span>
+                </div>
+                
+                <div class="config-item">
+                    <span><strong>TLS:</strong></span>
+                    <span>
+                        <span class="status-indicator {% if email_use_tls %}status-active{% else %}status-inactive{% endif %}"></span>
+                        {{ email_use_tls|yesno:"Habilitado,Deshabilitado" }}
+                    </span>
+                </div>
+                
+                <div class="config-item">
+                    <span><strong>Email por defecto:</strong></span>
+                    <span>{{ default_from_email }}</span>
+                </div>
+                
+                <div class="config-item">
+                    <span><strong>Email admin:</strong></span>
+                    <span>{{ admin_email }}</span>
+                </div>
+                
+                <div class="config-item">
+                    <span><strong>Notificaciones:</strong></span>
+                    <span>
+                        <span class="status-indicator {% if notifications_enabled %}status-active{% else %}status-inactive{% endif %}"></span>
+                        {{ notifications_enabled|yesno:"Habilitadas,Deshabilitadas" }}
+                    </span>
+                </div>
+
+                 Agregando información de estado SMTP 
+                <div class="config-item">
+                    <span><strong>Estado SMTP:</strong></span>
+                    <span>
+                        <span class="status-indicator {% if smtp_ready %}status-active{% else %}status-inactive{% endif %}"></span>
+                        {% if smtp_ready %}Listo para envío{% else %}No configurado{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Información
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-3">
+                        <small>
+                            <strong>Console Backend:</strong> Los emails se muestran en la consola del servidor.<br>
+                            <strong>File Backend:</strong> Los emails se guardan en archivos.<br>
+                            <strong>SMTP Backend:</strong> Los emails se envían realmente.
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Usuarios disponibles:</strong> {{ users_for_testing.count }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Tickets recientes:</strong> {{ recent_tickets.count }}
+                    </div>
+
+                     Agregando información de configuración del .env 
+                    {% if config_mismatch %}
+                    <div class="alert alert-warning mb-3">
+                        <small>
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <strong>Discrepancia detectada:</strong> La configuración del .env no coincide con Django. Reinicia el servidor.
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+     Pruebas de Email 
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-flask me-2"></i>
+                        Ejecutar Pruebas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="recipient_email" class="form-label">Email de destino:</label>
+                                <input type="email" class="form-control" id="recipient_email" name="recipient_email" 
+                                       value="jhoelperaltap@gmail.com" placeholder="jhoelperaltap@gmail.com">
+                                <small class="form-text text-muted">
+                                    Email donde se enviarán las pruebas (solo para backends SMTP reales)
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="mb-3">Tipos de Prueba:</h6>
+                                
+                                 Agregando botón de prueba de conexión 
+                                <button type="submit" name="test_type" value="connection" class="btn btn-secondary test-button">
+                                    <i class="fas fa-plug me-1"></i>
+                                    Probar Conexión
+                                </button>
+                                
+                                <button type="submit" name="test_type" value="basic" class="btn btn-primary test-button" {% if not smtp_ready %}disabled{% endif %}>
+                                    <i class="fas fa-envelope me-1"></i>
+                                    Email Básico
+                                </button>
+                                
+                                <button type="submit" name="test_type" value="html" class="btn btn-success test-button" {% if not smtp_ready %}disabled{% endif %}>
+                                    <i class="fas fa-code me-1"></i>
+                                    Email HTML
+                                </button>
+                                
+                                <button type="submit" name="test_type" value="notification" class="btn btn-info test-button" {% if not smtp_ready %}disabled{% endif %}>
+                                    <i class="fas fa-bell me-1"></i>
+                                    Notificación Ticket
+                                </button>
+                                
+                                <button type="submit" name="test_type" value="bulk" class="btn btn-warning test-button" {% if not smtp_ready %}disabled{% endif %}>
+                                    <i class="fas fa-paper-plane me-1"></i>
+                                    Envío Masivo
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                     Actualizando mensaje de advertencia 
+                    {% if smtp_ready %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>SMTP Configurado:</strong> Los emails se enviarán realmente al email especificado usando {{ email_host }}.
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>SMTP No Configurado:</strong> Verifica la configuración en tu archivo .env. Los botones de envío están deshabilitados hasta que la conexión SMTP sea exitosa.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+     Usuarios para Pruebas 
+    {% if users_for_testing %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users me-2"></i>
+                        Usuarios Disponibles para Pruebas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Email</th>
+                                    <th>Rol</th>
+                                    <th>Empresa</th>
+                                    <th>Activo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users_for_testing %}
+                                <tr>
+                                    <td>{{ user.get_full_name|default:user.username }}</td>
+                                    <td>{{ user.email|default:"Sin email" }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ user.get_role_display }}</span>
+                                    </td>
+                                    <td>{{ user.company.name|default:"Sin empresa" }}</td>
+                                    <td>
+                                        <span class="status-indicator {% if user.is_active %}status-active{% else %}status-inactive{% endif %}"></span>
+                                        {{ user.is_active|yesno:"Sí,No" }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Actualizar placeholder del email según el tipo de backend
+    const emailBackend = '{{ email_backend }}';
+    const emailInput = document.getElementById('recipient_email');
+    const smtpReady = {{ smtp_ready|yesno:"true,false" }};
+    
+    if (emailBackend.includes('console') || emailBackend.includes('filebased')) {
+        emailInput.placeholder = 'jhoelperaltap@gmail.com (se enviará realmente)';
+        emailInput.placeholder = 'jhoelperaltap@gmail.com (se enviará realmente)';
+    } else {
+        emailInput.placeholder = 'jhoelperaltap@gmail.com (SMTP no configurado)';
+    }
+    
+    // Confirmación para envío masivo
+    const bulkButton = document.querySelector('button[value="bulk"]');
+    if (bulkButton) {
+        bulkButton.addEventListener('click', function(e) {
+            if (!confirm('¿Estás seguro de enviar emails a múltiples usuarios? Esto puede generar muchos emails.')) {
+                e.preventDefault();
+            }
+        });
+    }
+
+    const disabledButtons = document.querySelectorAll('button[disabled]');
+    disabledButtons.forEach(button => {
+        button.setAttribute('title', 'Configura SMTP primero usando el botón "Probar Conexión"');
+        button.style.cursor = 'not-allowed';
+    });
+});
+</script>
+{% endblock %}

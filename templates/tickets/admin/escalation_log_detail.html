@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle de Log - Escalamiento - Helpdesk{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+   Header 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-xl">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          <i class="fas fa-file-alt mr-3"></i>
+          Detalle de Log de Escalamiento
+        </h1>
+        <p class="text-gray-600">Información detallada del evento de escalamiento</p>
+      </div>
+      
+      <a href="{% url 'tickets:admin_escalation_dashboard' %}" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+        <i class="fas fa-arrow-left mr-2"></i>Volver al Dashboard
+      </a>
+    </div>
+  </div>
+
+   Información del Log 
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+       Información Principal 
+      <div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Información Principal</h3>
+        
+        <div class="space-y-4">
+          <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+            <span class="font-medium text-gray-700">Acción:</span>
+            <span class="px-3 py-1 rounded-full text-sm font-medium
+              {% if log.action == 'escalated' %}bg-red-100 text-red-800
+              {% elif log.action == 'paused' %}bg-yellow-100 text-yellow-800
+              {% elif log.action == 'resumed' %}bg-green-100 text-green-800
+              {% else %}bg-gray-100 text-gray-800{% endif %}">
+              {{ log.get_action_display }}
+            </span>
+          </div>
+          
+          <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+            <span class="font-medium text-gray-700">Nivel:</span>
+            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+              Nivel {{ log.level }}
+            </span>
+          </div>
+          
+          <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+            <span class="font-medium text-gray-700">Fecha:</span>
+            <span class="text-gray-600">{{ log.created_at|date:"d/m/Y H:i:s" }}</span>
+          </div>
+          
+          <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+            <span class="font-medium text-gray-700">Realizado por:</span>
+            <span class="text-gray-600">
+              {% if log.created_by %}
+                {{ log.created_by.get_full_name|default:log.created_by.username }}
+              {% else %}
+                Sistema Automático
+              {% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+
+       Información del Ticket 
+      <div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Información del Ticket</h3>
+        
+        <div class="space-y-4">
+          <div class="p-4 border border-gray-200 rounded-lg">
+            <div class="flex justify-between items-start mb-2">
+              <h4 class="font-semibold text-gray-800">{{ log.ticket.reference }}</h4>
+              <span class="px-2 py-1 rounded-full text-xs font-medium
+                {% if log.ticket.priority == 'HIGH' %}bg-red-100 text-red-800
+                {% elif log.ticket.priority == 'MEDIUM' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-green-100 text-green-800{% endif %}">
+                {{ log.ticket.get_priority_display }}
+              </span>
+            </div>
+            <p class="text-gray-600 text-sm mb-3">{{ log.ticket.title }}</p>
+            <div class="flex justify-between text-xs text-gray-500">
+              <span>Empresa: {{ log.ticket.company.name|default:"N/A" }}</span>
+              <span>Estado: {{ log.ticket.get_status_display }}</span>
+            </div>
+            <div class="mt-2">
+              <a href="{% url 'tickets:ticket_detail' log.ticket.pk %}" class="text-blue-600 hover:text-blue-800 text-sm">
+                <i class="fas fa-external-link-alt mr-1"></i>Ver Ticket
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+     Usuarios Involucrados 
+    {% if log.from_user or log.to_user %}
+    <div class="mt-8 pt-6 border-t border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Usuarios Involucrados</h3>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% if log.from_user %}
+        <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <h4 class="font-semibold text-red-800 mb-2">
+            <i class="fas fa-user-minus mr-2"></i>Desde
+          </h4>
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-red-200 rounded-full flex items-center justify-center">
+              <i class="fas fa-user text-red-600"></i>
+            </div>
+            <div>
+              <p class="font-medium text-red-800">{{ log.from_user.get_full_name|default:log.from_user.username }}</p>
+              <p class="text-sm text-red-600">{{ log.from_user.email }}</p>
+              <p class="text-xs text-red-500">{{ log.from_user.get_role_display }}</p>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        
+        {% if log.to_user %}
+        <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <h4 class="font-semibold text-green-800 mb-2">
+            <i class="fas fa-user-plus mr-2"></i>Hacia
+          </h4>
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-green-200 rounded-full flex items-center justify-center">
+              <i class="fas fa-user text-green-600"></i>
+            </div>
+            <div>
+              <p class="font-medium text-green-800">{{ log.to_user.get_full_name|default:log.to_user.username }}</p>
+              <p class="text-sm text-green-600">{{ log.to_user.email }}</p>
+              <p class="text-xs text-green-500">{{ log.to_user.get_role_display }}</p>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+     Regla de Escalamiento 
+    {% if log.escalation_rule %}
+    <div class="mt-8 pt-6 border-t border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Regla de Escalamiento Aplicada</h3>
+      
+      <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <span class="text-sm font-medium text-blue-700">Empresa:</span>
+            <p class="text-blue-800">
+              {% if log.escalation_rule.company %}
+                {{ log.escalation_rule.company.name }}
+              {% else %}
+                Global
+              {% endif %}
+            </p>
+          </div>
+          <div>
+            <span class="text-sm font-medium text-blue-700">Prioridad:</span>
+            <p class="text-blue-800">{{ log.escalation_rule.get_priority_display }}</p>
+          </div>
+          <div>
+            <span class="text-sm font-medium text-blue-700">Horas para escalar:</span>
+            <p class="text-blue-800">{{ log.escalation_rule.hours_to_escalate }}h</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+     Notas 
+    {% if log.notes %}
+    <div class="mt-8 pt-6 border-t border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Notas</h3>
+      <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+        <p class="text-gray-700">{{ log.notes }}</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+   Logs Relacionados 
+  {% if related_logs %}
+  <div class="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
+    <h3 class="text-lg font-semibold text-gray-800 mb-6">
+      <i class="fas fa-history mr-2 text-blue-500"></i>
+      Otros Eventos del Mismo Ticket
+    </h3>
+    
+    <div class="space-y-3">
+      {% for related_log in related_logs %}
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center
+            {% if related_log.action == 'escalated' %}bg-red-100 text-red-600
+            {% elif related_log.action == 'paused' %}bg-yellow-100 text-yellow-600
+            {% elif related_log.action == 'resumed' %}bg-green-100 text-green-600
+            {% else %}bg-gray-100 text-gray-600{% endif %}">
+            <i class="fas fa-circle text-xs"></i>
+          </div>
+          <div>
+            <p class="font-medium text-gray-800">{{ related_log.get_action_display }}</p>
+            <p class="text-sm text-gray-600">Nivel {{ related_log.level }}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-sm text-gray-600">{{ related_log.created_at|date:"d/m/Y H:i" }}</p>
+          <p class="text-xs text-gray-500">
+            {% if related_log.created_by %}
+              {{ related_log.created_by.username }}
+            {% else %}
+              Sistema
+            {% endif %}
+          </p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

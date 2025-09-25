@@ -1,0 +1,32 @@
+{% extends 'emails/base_email.html' %}
+
+{% block title %}Bienvenido al Sistema de Helpdesk{% endblock %}
+
+{% block content %}
+<h2>¡Bienvenido al Sistema de Helpdesk! 🎉</h2>
+
+<p>Hola {{ user.get_full_name|default:user.username }},</p>
+
+<p>Tu cuenta ha sido creada exitosamente en nuestro sistema de Helpdesk.</p>
+
+<div class="ticket-info">
+    <h3>Información de tu cuenta:</h3>
+    <p><strong>Nombre de usuario:</strong> {{ user.username }}</p>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Rol:</strong> {{ user.get_role_display }}</p>
+    <p><strong>Empresa:</strong> {{ user.company.name }}</p>
+    
+    {% if password %}
+    <p><strong>Contraseña temporal:</strong> {{ password }}</p>
+    <p style="color: #dc2626;"><strong>⚠️ Por favor, cambia tu contraseña en tu primer inicio de sesión.</strong></p>
+    {% endif %}
+</div>
+
+<a href="{{ request.build_absolute_uri }}/users/login/" class="button">
+    Iniciar Sesión
+</a>
+
+<p>Si tienes alguna pregunta, no dudes en contactar al administrador del sistema.</p>
+
+<p>¡Esperamos que tengas una excelente experiencia usando nuestro sistema!</p>
+{% endblock %}
