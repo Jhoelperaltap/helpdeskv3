@@ -165,3 +165,37 @@ class EscalationSettings(models.Model):
         
         hour = datetime_obj.hour
         return self.business_start_hour <= hour < self.business_end_hour
+
+class EmailLog(models.Model):
+    """Registro de intentos de envío de email para debugging"""
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('sending', 'Enviando'),
+        ('sent', 'Enviado'),
+        ('failed', 'Fallido'),
+    ]
+    
+    TYPE_CHOICES = [
+        ('basic', 'Email Básico'),
+        ('html', 'Email HTML'),
+        ('ticket_notification', 'Notificación de Ticket'),
+        ('bulk', 'Envío Masivo'),
+        ('connection_test', 'Prueba de Conexión'),
+    ]
+    
+    email_type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    error_message = models.TextField(blank=True)
+    smtp_host = models.CharField(max_length=255, blank=True)
+    smtp_port = models.IntegerField(null=True, blank=True)
+    sent_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.get_email_type_display()} a {self.recipient} - {self.get_status_display()}"
