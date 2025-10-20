@@ -11,6 +11,7 @@ from .models import EscalationRule, EscalationSettings, EscalationLog, Ticket
 from .forms import EscalationRuleForm, EscalationSettingsForm
 from apps.companies.models import Company
 from django.contrib.auth import get_user_model
+import socket
 
 User = get_user_model()
 
@@ -399,7 +400,7 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
         from django.conf import settings
         import os
         
-        smtp_connection_status = self.test_smtp_connection()
+        smtp_connection_status = self.test_smtp_connection_fast()
         
         # Verificar configuración actual de Django
         email_user_configured = bool(settings.EMAIL_HOST_USER)
@@ -455,81 +456,61 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
         
         return context
     
-    def test_smtp_connection(self):
+    def test_smtp_connection_fast(self):
         """
-        Prueba la conexión SMTP real usando la configuración del .env
+        Prueba rápida de conexión SMTP con timeout corto para evitar 504 en producción
         """
-        from django.core.mail import get_connection
+        import socket
         import os
         
         try:
-            # Crear conexión SMTP directa usando variables de entorno
-            smtp_connection = get_connection(
-                backend='django.core.mail.backends.smtp.EmailBackend',
-                host=os.environ.get('EMAIL_HOST', ''),
-                port=int(os.environ.get('EMAIL_PORT', 587)),
-                username=os.environ.get('EMAIL_HOST_USER', ''),
-                password=os.environ.get('EMAIL_HOST_PASSWORD', ''),
-                use_tls=os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true',
-            )
+            host = os.environ.get('EMAIL_HOST', '')
+            port = int(os.environ.get('EMAIL_PORT', 587))
+            username = os.environ.get('EMAIL_HOST_USER', '')
+            password = os.environ.get('EMAIL_HOST_PASSWORD', '')
             
-            # Verificar que tenemos configuración
-            if not smtp_connection.username or not smtp_connection.password:
+            if not username or not password:
                 return {
                     'success': False,
-                    'error': 'Configuración SMTP incompleta. Verifica EMAIL_HOST_USER y EMAIL_HOST_PASSWORD en .env',
-                    'details': {
-                        'host': smtp_connection.host,
-                        'port': smtp_connection.port,
-                        'username': smtp_connection.username,
-                        'has_password': bool(smtp_connection.password),
-                        'use_tls': smtp_connection.use_tls,
+                    'error': 'Configuración SMTP incompleta',
+                    'details': {'host': host, 'port': port, 'username': username}
+                }
+            
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3)
+            
+            try:
+                result = sock.connect_ex((host, port))
+                sock.close()
+                
+                if result == 0:
+                    return {
+                        'success': True,
+                        'message': f'Puerto SMTP {port} accesible en {host}',
+                        'details': {'host': host, 'port': port, 'username': username}
                     }
+                else:
+                    return {
+                        'success': False,
+                        'error': f'No se puede conectar al puerto {port}',
+                        'suggestions': ['Verifica firewall', 'Verifica host y puerto']
+                    }
+            except socket.timeout:
+                return {
+                    'success': False,
+                    'error': 'Timeout conectando a SMTP (3s)',
+                    'suggestions': ['Verifica conexión a internet', 'Verifica firewall']
                 }
-            
-            # Probar conexión real
-            smtp_connection.open()
-            smtp_connection.close()
-            
-            return {
-                'success': True,
-                'message': f'Conexión SMTP exitosa a {smtp_connection.host}:{smtp_connection.port}',
-                'details': {
-                    'host': smtp_connection.host,
-                    'port': smtp_connection.port,
-                    'username': smtp_connection.username,
-                    'has_password': bool(smtp_connection.password),
-                    'use_tls': smtp_connection.use_tls,
-                }
-            }
-            
+                
         except Exception as e:
-            error_msg = str(e)
-            suggestions = []
-            
-            if 'authentication failed' in error_msg.lower():
-                suggestions.append('Verifica que EMAIL_HOST_PASSWORD sea una App Password válida de Gmail')
-            elif 'connection refused' in error_msg.lower():
-                suggestions.append('Verifica la configuración del host SMTP y puerto')
-            elif 'tls' in error_msg.lower():
-                suggestions.append('Verifica la configuración TLS')
-            elif 'timeout' in error_msg.lower():
-                suggestions.append('Verifica la conexión a internet y firewall')
-            
             return {
                 'success': False,
-                'error': error_msg,
-                'suggestions': suggestions,
-                'details': {
-                    'host': os.environ.get('EMAIL_HOST', ''),
-                    'port': os.environ.get('EMAIL_PORT', '587'),
-                    'username': os.environ.get('EMAIL_HOST_USER', ''),
-                    'has_password': bool(os.environ.get('EMAIL_HOST_PASSWORD', '')),
-                }
+                'error': str(e),
+                'suggestions': ['Verifica configuración en .env']
             }
 
     def post(self, request, *args, **kwargs):
-        """Manejar envío de emails de prueba con configuración SMTP forzada"""
+        """Manejar envío de emails con timeouts cortos"""
         from django.core.mail import send_mail, EmailMessage, get_connection
         from django.conf import settings
         import os
@@ -537,142 +518,60 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
         test_type = request.POST.get('test_type')
         recipient_email = request.POST.get('recipient_email', 'test@example.com')
         
-        # Crear conexión SMTP directa usando variables de entorno
-        smtp_connection = get_connection(
-            backend='django.core.mail.backends.smtp.EmailBackend',
-            host=os.environ.get('EMAIL_HOST', settings.EMAIL_HOST),
-            port=int(os.environ.get('EMAIL_PORT', settings.EMAIL_PORT)),
-            username=os.environ.get('EMAIL_HOST_USER', settings.EMAIL_HOST_USER),
-            password=os.environ.get('EMAIL_HOST_PASSWORD', settings.EMAIL_HOST_PASSWORD),
-            use_tls=os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true',
-        )
-        
-        # Verificar que tenemos configuración SMTP
-        if not smtp_connection.username or not smtp_connection.password:
-            messages.error(request, '❌ Configuración SMTP incompleta. Verifica EMAIL_HOST_USER y EMAIL_HOST_PASSWORD en tu archivo .env')
+        try:
+            smtp_connection = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=os.environ.get('EMAIL_HOST', settings.EMAIL_HOST),
+                port=int(os.environ.get('EMAIL_PORT', settings.EMAIL_PORT)),
+                username=os.environ.get('EMAIL_HOST_USER', settings.EMAIL_HOST_USER),
+                password=os.environ.get('EMAIL_HOST_PASSWORD', settings.EMAIL_HOST_PASSWORD),
+                use_tls=os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true',
+                timeout=10,  # Timeout de 10 segundos
+            )
+        except Exception as e:
+            messages.error(request, f'Error creando conexión SMTP: {str(e)}')
             return redirect('tickets:admin_email_test')
         
-        # Mostrar información sobre la configuración que se usará
-        messages.info(request, f'🔧 Usando configuración SMTP: {smtp_connection.host}:{smtp_connection.port} con usuario {smtp_connection.username}')
+        if not smtp_connection.username or not smtp_connection.password:
+            messages.error(request, 'Configuración SMTP incompleta')
+            return redirect('tickets:admin_email_test')
         
         try:
-            # Probar conexión primero
-            smtp_connection.open()
-            messages.success(request, '✅ Conexión SMTP establecida correctamente')
-            smtp_connection.close()
-            
             if test_type == 'connection':
-                messages.success(request, f'✅ Prueba de conexión SMTP exitosa a {smtp_connection.host}:{smtp_connection.port}')
-                messages.info(request, f'🔧 Usuario: {smtp_connection.username} | TLS: {"Habilitado" if smtp_connection.use_tls else "Deshabilitado"}')
+                import socket
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                result = sock.connect_ex((smtp_connection.host, smtp_connection.port))
+                sock.close()
+                
+                if result == 0:
+                    messages.success(request, f'Conexión SMTP exitosa a {smtp_connection.host}:{smtp_connection.port}')
+                else:
+                    messages.error(request, f'No se puede conectar al puerto {smtp_connection.port}')
                 return redirect('tickets:admin_email_test')
             
             if test_type == 'basic':
-                message_body = f"""
-¡Hola!
-
-Este es un email de prueba básico del sistema de helpdesk.
-
-Configuración SMTP utilizada:
-- Host: {smtp_connection.host}:{smtp_connection.port}
-- Usuario: {smtp_connection.username}
-- TLS: {'Habilitado' if smtp_connection.use_tls else 'Deshabilitado'}
-- Enviado desde: {os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)}
-
-✅ Si recibes este mensaje, la configuración SMTP está funcionando correctamente.
-
-¡Saludos!
-Sistema Helpdesk
-                """
-                
                 send_mail(
-                    subject='[Helpdesk] ✅ Prueba Básica SMTP - Configuración Exitosa',
-                    message=message_body,
+                    subject='[Helpdesk] Prueba Básica SMTP',
+                    message=f'Email de prueba desde {smtp_connection.host}',
                     from_email=os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL),
                     recipient_list=[recipient_email],
                     connection=smtp_connection,
                     fail_silently=False,
                 )
-                messages.success(request, f'✅ Email básico enviado exitosamente a {recipient_email}')
+                messages.success(request, f'Email enviado a {recipient_email}')
                 
             elif test_type == 'html':
                 html_content = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <title>✅ Prueba SMTP Exitosa - Helpdesk</title>
-                    <style>
-                        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
-                        .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-                        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }}
-                        .header h1 {{ margin: 0; font-size: 28px; }}
-                        .content {{ padding: 30px; }}
-                        .success-badge {{ background: #10b981; color: white; padding: 8px 16px; border-radius: 20px; display: inline-block; margin: 10px 0; font-weight: bold; }}
-                        .config-box {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; }}
-                        .config-item {{ display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }}
-                        .config-item:last-child {{ border-bottom: none; }}
-                        .check-list {{ list-style: none; padding: 0; }}
-                        .check-list li {{ padding: 8px 0; }}
-                        .check-list li:before {{ content: "✅"; margin-right: 10px; }}
-                        .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
-                        .footer strong {{ color: white; }}
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="header">
-                            <h1>🎉 Configuración SMTP Exitosa</h1>
-                            <p>Sistema de Helpdesk - Prueba de Email HTML</p>
-                        </div>
-                        <div class="content">
-                            <div class="success-badge">✅ SMTP Funcionando Correctamente</div>
-                            
-                            <p>¡Excelente! Si estás viendo este email con formato HTML, significa que:</p>
-                            
-                            <ul class="check-list">
-                                <li>La configuración SMTP está funcionando perfectamente</li>
-                                <li>Gmail está permitiendo el envío de emails</li>
-                                <li>Las credenciales son correctas y válidas</li>
-                                <li>El sistema puede enviar emails HTML con estilos</li>
-                                <li>La conexión TLS está funcionando</li>
-                            </ul>
-                            
-                            <div class="config-box">
-                                <h3 style="margin-top: 0; color: #374151;">📋 Configuración SMTP Utilizada:</h3>
-                                <div class="config-item">
-                                    <span><strong>Host SMTP:</strong></span>
-                                    <span>{smtp_connection.host}:{smtp_connection.port}</span>
-                                </div>
-                                <div class="config-item">
-                                    <span><strong>Usuario:</strong></span>
-                                    <span>{smtp_connection.username}</span>
-                                </div>
-                                <div class="config-item">
-                                    <span><strong>TLS:</strong></span>
-                                    <span>{'✅ Habilitado' if smtp_connection.use_tls else '❌ Deshabilitado'}</span>
-                                </div>
-                                <div class="config-item">
-                                    <span><strong>From Email:</strong></span>
-                                    <span>{os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)}</span>
-                                </div>
-                            </div>
-                            
-                            <div style="background: #ecfdf5; border: 1px solid #10b981; border-radius: 8px; padding: 15px; margin: 20px 0;">
-                                <p style="margin: 0; color: #065f46; font-weight: bold;">🚀 ¡Todo está listo para producción!</p>
-                                <p style="margin: 5px 0 0 0; color: #047857;">Tu sistema de helpdesk puede enviar notificaciones reales por email.</p>
-                            </div>
-                        </div>
-                        <div class="footer">
-                            <p><strong>Sistema Helpdesk</strong> - Prueba de Configuración SMTP</p>
-                            <p style="font-size: 12px;">Enviado automáticamente desde el panel de administración</p>
-                        </div>
-                    </div>
-                </body>
-                </html>
+                <html><body>
+                <h1>Prueba HTML SMTP</h1>
+                <p>Configuración: {smtp_connection.host}:{smtp_connection.port}</p>
+                <p>Usuario: {smtp_connection.username}</p>
+                </body></html>
                 """
                 
                 email = EmailMessage(
-                    subject='[Helpdesk] 🎉 Prueba HTML SMTP - ¡Configuración Exitosa!',
+                    subject='[Helpdesk] Prueba HTML SMTP',
                     body=html_content,
                     from_email=os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL),
                     to=[recipient_email],
@@ -680,145 +579,11 @@ Sistema Helpdesk
                 )
                 email.content_subtype = 'html'
                 email.send()
+                messages.success(request, f'Email HTML enviado a {recipient_email}')
                 
-                messages.success(request, f'✅ Email HTML enviado exitosamente a {recipient_email}')
-                
-            elif test_type == 'notification':
-                # Simular notificación de ticket
-                ticket = Ticket.objects.first()
-                if ticket:
-                    html_content = f"""
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <title>🎫 Notificación de Ticket</title>
-                        <style>
-                            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
-                            .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-                            .header {{ background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 30px 20px; text-align: center; }}
-                            .content {{ padding: 30px; }}
-                            .ticket-box {{ background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #dc2626; border-radius: 8px; padding: 20px; margin: 20px 0; }}
-                            .priority-high {{ color: #dc2626; font-weight: bold; }}
-                            .priority-medium {{ color: #d97706; font-weight: bold; }}
-                            .priority-low {{ color: #059669; font-weight: bold; }}
-                            .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <div class="header">
-                                <h1>🎫 Notificación de Ticket</h1>
-                                <p>Sistema de Helpdesk</p>
-                            </div>
-                            <div class="content">
-                                <p>Hola <strong>{request.user.get_full_name() or request.user.username}</strong>,</p>
-                                <p>El ticket <strong>#{ticket.id}</strong> ha sido actualizado:</p>
-                                
-                                <div class="ticket-box">
-                                    <h3 style="margin-top: 0; color: #374151;">{ticket.title}</h3>
-                                    <p><strong>Estado:</strong> <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">{ticket.get_status_display()}</span></p>
-                                    <p><strong>Prioridad:</strong> <span class="priority-{ticket.priority.lower()}">{ticket.get_priority_display()}</span></p>
-                                    <p><strong>Empresa:</strong> {ticket.company.name}</p>
-                                    <p><strong>Asignado a:</strong> {ticket.assigned_to.get_full_name() if ticket.assigned_to else 'Sin asignar'}</p>
-                                    <p><strong>Creado:</strong> {ticket.created_at.strftime('%d/%m/%Y %H:%M')}</p>
-                                    
-                                    <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
-                                        <p style="margin: 0;"><strong>Descripción:</strong></p>
-                                        <p style="margin: 5px 0 0 0; color: #6b7280;">{ticket.description[:200]}{'...' if len(ticket.description) > 200 else ''}</p>
-                                    </div>
-                                </div>
-                                
-                                <p>Puedes ver más detalles del ticket accediendo al sistema de helpdesk.</p>
-                                
-                                <div style="background: #eff6ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 15px; margin: 20px 0;">
-                                    <p style="margin: 0; color: #1e40af; font-weight: bold;">💡 Esta es una prueba de notificación</p>
-                                    <p style="margin: 5px 0 0 0; color: #1d4ed8;">El sistema SMTP está funcionando correctamente para enviar notificaciones reales.</p>
-                                </div>
-                            </div>
-                            <div class="footer">
-                                <p><strong>Sistema Helpdesk</strong></p>
-                                <p style="font-size: 12px;">Este es un email automático, no responder.</p>
-                            </div>
-                        </div>
-                    </body>
-                    </html>
-                    """
-                    
-                    email = EmailMessage(
-                        subject=f'[Helpdesk] 🎫 Ticket #{ticket.id} - {ticket.title}',
-                        body=html_content,
-                        from_email=os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL),
-                        to=[recipient_email],
-                        connection=smtp_connection,
-                    )
-                    email.content_subtype = 'html'
-                    email.send()
-                    
-                    messages.success(request, f'✅ Notificación de ticket enviada exitosamente a {recipient_email}')
-                else:
-                    messages.error(request, '❌ No hay tickets disponibles para la prueba')
-                    
-            elif test_type == 'bulk':
-                users = User.objects.filter(is_active=True, email__isnull=False).exclude(email='')[:3]  # Limitar a 3 para pruebas
-                sent_count = 0
-                failed_count = 0
-                
-                for user in users:
-                    try:
-                        send_mail(
-                            subject='[Helpdesk] 📧 Prueba Masiva - Sistema de Notificaciones',
-                            message=f"""
-Hola {user.get_full_name() or user.username},
-
-Este es un email de prueba masiva del sistema de helpdesk.
-
-Tu información:
-- Usuario: {user.username}
-- Email: {user.email}
-- Rol: {user.get_role_display()}
-- Empresa: {user.company.name if user.company else 'Sin empresa'}
-
-✅ Esta prueba verifica que el sistema puede enviar notificaciones masivas correctamente usando SMTP real.
-
-Configuración SMTP utilizada:
-- Host: {smtp_connection.host}:{smtp_connection.port}
-- Usuario: {smtp_connection.username}
-
-¡El sistema está listo para enviar notificaciones reales!
-
-Saludos,
-Sistema Helpdesk
-                            """,
-                            from_email=os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL),
-                            recipient_list=[user.email],
-                            connection=smtp_connection,
-                            fail_silently=False,
-                        )
-                        sent_count += 1
-                    except Exception as e:
-                        failed_count += 1
-                        print(f"Error enviando email a {user.email}: {str(e)}")
-                
-                if sent_count > 0:
-                    messages.success(request, f'✅ Emails masivos enviados exitosamente a {sent_count} usuarios')
-                if failed_count > 0:
-                    messages.warning(request, f'⚠️ {failed_count} emails fallaron en el envío')
-                    
-            else:
-                messages.error(request, '❌ Tipo de prueba no válido')
-                
+        except socket.timeout:
+            messages.error(request, 'Timeout enviando email. Verifica configuración SMTP.')
         except Exception as e:
-            messages.error(request, f'❌ Error enviando email: {str(e)}')
-            print(f"Error detallado: {str(e)}")
-            
-            # Sugerencias específicas para errores comunes
-            error_str = str(e).lower()
-            if 'authentication failed' in error_str:
-                messages.error(request, '💡 Verifica que EMAIL_HOST_PASSWORD sea una App Password válida de Gmail')
-            elif 'connection refused' in error_str:
-                messages.error(request, '💡 Verifica la configuración del host SMTP y puerto')
-            elif 'tls' in error_str:
-                messages.error(request, '💡 Verifica la configuración TLS')
+            messages.error(request, f'Error: {str(e)}')
         
         return redirect('tickets:admin_email_test')
