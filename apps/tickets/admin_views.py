@@ -7,7 +7,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.db.models import Q, Count, Avg
 from datetime import timedelta
-from .models import EscalationRule, EscalationSettings, EscalationLog, Ticket
+from .models import EscalationRule, EscalationSettings, EscalationLog, Ticket, EmailLog
 from .forms import EscalationRuleForm, EscalationSettingsForm
 from apps.companies.models import Company
 from django.contrib.auth import get_user_model
@@ -389,10 +389,11 @@ def bulk_escalation_actions(request):
 class EmailTestView(SuperAdminRequiredMixin, ListView):
     """Vista para probar el sistema de emails en desarrollo"""
     template_name = 'tickets/admin/email_test.html'
-    context_object_name = 'test_results'
+    context_object_name = 'email_logs'
+    paginate_by = 10
     
     def get_queryset(self):
-        return []  # No necesitamos queryset para esta vista
+        return EmailLog.objects.filter(sent_by=self.request.user).order_by('-created_at')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -402,18 +403,15 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
         
         smtp_connection_status = self.test_smtp_connection_fast()
         
-        # Verificar configuración actual de Django
         email_user_configured = bool(settings.EMAIL_HOST_USER)
         email_password_configured = bool(settings.EMAIL_HOST_PASSWORD)
         is_smtp_backend = settings.EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend'
         
-        # Verificar variables de entorno directamente
         env_email_backend = os.environ.get('EMAIL_BACKEND', '')
         env_email_host = os.environ.get('EMAIL_HOST', '')
         env_email_user = os.environ.get('EMAIL_HOST_USER', '')
         env_email_password = bool(os.environ.get('EMAIL_HOST_PASSWORD', ''))
         
-        # Detectar discrepancias entre .env y Django
         config_mismatch = (
             env_email_backend != settings.EMAIL_BACKEND or
             env_email_host != settings.EMAIL_HOST or
@@ -421,7 +419,6 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
         )
         
         context.update({
-            # Configuración actual de Django
             'email_backend': settings.EMAIL_BACKEND,
             'email_host': settings.EMAIL_HOST,
             'email_port': settings.EMAIL_PORT,
@@ -434,7 +431,6 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
             'admin_email': getattr(settings, 'ADMIN_EMAIL', settings.DEFAULT_FROM_EMAIL),
             'notifications_enabled': getattr(settings, 'EMAIL_NOTIFICATIONS_ENABLED', True),
             
-            # Variables de entorno para comparación
             'env_email_backend': env_email_backend,
             'env_email_host': env_email_host,
             'env_email_user': env_email_user,
@@ -445,21 +441,21 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
             'smtp_connection_success': smtp_connection_status.get('success', False),
             'smtp_connection_error': smtp_connection_status.get('error', ''),
             
-            # Datos para pruebas
             'users_for_testing': User.objects.filter(is_active=True)[:10],
             'recent_tickets': Ticket.objects.select_related('company', 'created_by')[:5],
             
-            # Estado de configuración
             'smtp_ready': is_smtp_backend and email_user_configured and email_password_configured and smtp_connection_status.get('success', False),
             'needs_restart': config_mismatch,
+            
+            'total_sent': EmailLog.objects.filter(sent_by=self.request.user, status='sent').count(),
+            'total_failed': EmailLog.objects.filter(sent_by=self.request.user, status='failed').count(),
+            'total_pending': EmailLog.objects.filter(sent_by=self.request.user, status__in=['pending', 'sending']).count(),
         })
         
         return context
     
     def test_smtp_connection_fast(self):
-        """
-        Prueba rápida de conexión SMTP con timeout corto para evitar 504 en producción
-        """
+        """Prueba rápida de conexión SMTP con timeout corto para evitar 504 en producción"""
         import socket
         import os
         
@@ -509,25 +505,43 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                 'suggestions': ['Verifica configuración en .env']
             }
 
-    def send_email_async(self, email_func, success_message, error_prefix):
-        """
-        Envía email en un thread separado para evitar timeouts en producción
-        """
+    def send_email_async(self, email_log_id, email_func):
+        """Envía email en un thread separado y actualiza el log"""
         import threading
+        from django.utils import timezone
         
         def send_in_background():
             try:
+                email_log = EmailLog.objects.get(id=email_log_id)
+                email_log.status = 'sending'
+                email_log.save()
+                
+                # Ejecutar función de envío
                 email_func()
-                print(f"[v0] Email enviado exitosamente: {success_message}")
+                
+                email_log.status = 'sent'
+                email_log.sent_at = timezone.now()
+                email_log.save()
+                
+                print(f"[v0] Email enviado exitosamente: {email_log.email_type} a {email_log.recipient}")
+                
             except Exception as e:
-                print(f"[v0] Error enviando email: {error_prefix} - {str(e)}")
+                try:
+                    email_log = EmailLog.objects.get(id=email_log_id)
+                    email_log.status = 'failed'
+                    email_log.error_message = str(e)
+                    email_log.save()
+                except:
+                    pass
+                
+                print(f"[v0] Error enviando email: {str(e)}")
         
         thread = threading.Thread(target=send_in_background)
         thread.daemon = True
         thread.start()
 
     def post(self, request, *args, **kwargs):
-        """Manejar envío de emails con envío asíncrono para evitar timeouts"""
+        """Manejar envío de emails con logging completo"""
         from django.core.mail import send_mail, EmailMessage, get_connection
         from django.conf import settings
         import os
@@ -540,14 +554,21 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
             return redirect('tickets:admin_email_test')
         
         try:
+            email_port = int(os.environ.get('EMAIL_PORT', settings.EMAIL_PORT))
+            
+            # Puerto 465 usa SSL, puerto 587 usa TLS
+            use_ssl = email_port == 465
+            use_tls = email_port == 587
+            
             smtp_connection = get_connection(
                 backend='django.core.mail.backends.smtp.EmailBackend',
                 host=os.environ.get('EMAIL_HOST', settings.EMAIL_HOST),
-                port=int(os.environ.get('EMAIL_PORT', settings.EMAIL_PORT)),
+                port=email_port,
                 username=os.environ.get('EMAIL_HOST_USER', settings.EMAIL_HOST_USER),
                 password=os.environ.get('EMAIL_HOST_PASSWORD', settings.EMAIL_HOST_PASSWORD),
-                use_tls=os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true',
-                timeout=15,  # Aumentado timeout a 15 segundos
+                use_ssl=use_ssl,  # SSL para puerto 465
+                use_tls=use_tls,  # TLS para puerto 587
+                timeout=60,  # Aumentado a 60 segundos para producción
             )
         except Exception as e:
             messages.error(request, f'Error creando conexión SMTP: {str(e)}')
@@ -559,39 +580,71 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
         
         try:
             if test_type == 'connection':
+                email_log = EmailLog.objects.create(
+                    email_type='connection_test',
+                    recipient=recipient_email,
+                    subject='Prueba de Conexión SMTP',
+                    smtp_host=smtp_connection.host,
+                    smtp_port=smtp_connection.port,
+                    sent_by=request.user,
+                    status='pending'
+                )
+                
                 import socket
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(5)
+                sock.settimeout(10)  # Timeout más largo para prueba de conexión
                 result = sock.connect_ex((smtp_connection.host, smtp_connection.port))
                 sock.close()
                 
                 if result == 0:
-                    messages.success(request, f'✓ Conexión SMTP exitosa a {smtp_connection.host}:{smtp_connection.port}')
+                    email_log.status = 'sent'
+                    email_log.sent_at = timezone.now()
+                    email_log.save()
+                    messages.success(request, f'Conexión SMTP exitosa a {smtp_connection.host}:{smtp_connection.port}')
                 else:
-                    messages.error(request, f'✗ No se puede conectar al puerto {smtp_connection.port}. Verifica firewall y configuración.')
+                    email_log.status = 'failed'
+                    email_log.error_message = f'No se puede conectar al puerto {smtp_connection.port}'
+                    email_log.save()
+                    messages.error(request, f'No se puede conectar al puerto {smtp_connection.port}. Verifica firewall y configuración.')
                 return redirect('tickets:admin_email_test')
             
             from_email = os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
             
             if test_type == 'basic':
+                email_log = EmailLog.objects.create(
+                    email_type='basic',
+                    recipient=recipient_email,
+                    subject='[Helpdesk] Prueba Básica SMTP',
+                    smtp_host=smtp_connection.host,
+                    smtp_port=smtp_connection.port,
+                    sent_by=request.user,
+                    status='pending'
+                )
+                
                 def send_basic_email():
                     send_mail(
                         subject='[Helpdesk] Prueba Básica SMTP',
-                        message=f'Este es un email de prueba enviado desde el sistema Helpdesk.\n\nConfiguración SMTP:\n- Host: {smtp_connection.host}\n- Puerto: {smtp_connection.port}\n- Usuario: {smtp_connection.username}\n\nSi recibes este email, la configuración SMTP está funcionando correctamente.',
+                        message=f'Este es un email de prueba enviado desde el sistema Helpdesk.\n\nConfiguración SMTP:\n- Host: {smtp_connection.host}\n- Puerto: {smtp_connection.port}\n- Usuario: {smtp_connection.username}\n- SSL: {"Activado" if use_ssl else "Desactivado"}\n- TLS: {"Activado" if use_tls else "Desactivado"}\n\nSi recibes este email, la configuración SMTP está funcionando correctamente.',
                         from_email=from_email,
                         recipient_list=[recipient_email],
                         connection=smtp_connection,
                         fail_silently=False,
                     )
                 
-                self.send_email_async(
-                    send_basic_email,
-                    f'Email básico enviado a {recipient_email}',
-                    'Error enviando email básico'
-                )
-                messages.success(request, f'✓ Email básico en proceso de envío a {recipient_email}. Verifica tu bandeja de entrada en unos momentos.')
+                self.send_email_async(email_log.id, send_basic_email)
+                messages.success(request, f'Email básico en proceso de envío a {recipient_email}. Revisa el estado abajo en unos segundos.')
                 
             elif test_type == 'html':
+                email_log = EmailLog.objects.create(
+                    email_type='html',
+                    recipient=recipient_email,
+                    subject='[Helpdesk] Prueba HTML SMTP',
+                    smtp_host=smtp_connection.host,
+                    smtp_port=smtp_connection.port,
+                    sent_by=request.user,
+                    status='pending'
+                )
+                
                 def send_html_email():
                     html_content = f"""
                     <!DOCTYPE html>
@@ -609,7 +662,7 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                     <body>
                         <div class="container">
                             <div class="header">
-                                <h1>✓ Prueba HTML SMTP</h1>
+                                <h1>Prueba HTML SMTP</h1>
                             </div>
                             <div class="content">
                                 <p>Este es un email de prueba con formato HTML enviado desde el sistema Helpdesk.</p>
@@ -642,14 +695,20 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                     email.content_subtype = 'html'
                     email.send()
                 
-                self.send_email_async(
-                    send_html_email,
-                    f'Email HTML enviado a {recipient_email}',
-                    'Error enviando email HTML'
-                )
-                messages.success(request, f'✓ Email HTML en proceso de envío a {recipient_email}. Verifica tu bandeja de entrada en unos momentos.')
+                self.send_email_async(email_log.id, send_html_email)
+                messages.success(request, f'Email HTML en proceso de envío a {recipient_email}. Revisa el estado abajo.')
             
             elif test_type == 'ticket_notification':
+                email_log = EmailLog.objects.create(
+                    email_type='ticket_notification',
+                    recipient=recipient_email,
+                    subject='[Helpdesk] Nuevo Ticket #TEST-001',
+                    smtp_host=smtp_connection.host,
+                    smtp_port=smtp_connection.port,
+                    sent_by=request.user,
+                    status='pending'
+                )
+                
                 def send_ticket_notification():
                     html_content = """
                     <!DOCTYPE html>
@@ -667,7 +726,7 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                     <body>
                         <div class="container">
                             <div class="header">
-                                <h1>🎫 Nuevo Ticket Creado</h1>
+                                <h1>Nuevo Ticket Creado</h1>
                             </div>
                             <div class="ticket-info">
                                 <p><strong>Ticket #:</strong> TEST-001</p>
@@ -693,40 +752,43 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                     email.content_subtype = 'html'
                     email.send()
                 
-                self.send_email_async(
-                    send_ticket_notification,
-                    f'Notificación de ticket enviada a {recipient_email}',
-                    'Error enviando notificación de ticket'
-                )
-                messages.success(request, f'✓ Notificación de ticket en proceso de envío a {recipient_email}. Verifica tu bandeja de entrada en unos momentos.')
+                self.send_email_async(email_log.id, send_ticket_notification)
+                messages.success(request, f'Notificación de ticket en proceso de envío a {recipient_email}. Revisa el estado abajo.')
             
             elif test_type == 'bulk':
                 test_users = User.objects.filter(is_active=True, role='SUPERADMIN')[:3]
                 
-                def send_bulk_emails():
-                    for user in test_users:
+                for user in test_users:
+                    email_log = EmailLog.objects.create(
+                        email_type='bulk',
+                        recipient=user.email,
+                        subject='[Helpdesk] Prueba de Envío Masivo',
+                        smtp_host=smtp_connection.host,
+                        smtp_port=smtp_connection.port,
+                        sent_by=request.user,
+                        status='pending'
+                    )
+                    
+                    def send_bulk_email(user_obj=user, log_id=email_log.id):
                         send_mail(
                             subject='[Helpdesk] Prueba de Envío Masivo',
-                            message=f'Hola {user.get_full_name()},\n\nEste es un email de prueba masiva del sistema Helpdesk.',
+                            message=f'Hola {user_obj.get_full_name()},\n\nEste es un email de prueba masiva del sistema Helpdesk.',
                             from_email=from_email,
-                            recipient_list=[user.email],
+                            recipient_list=[user_obj.email],
                             connection=smtp_connection,
                             fail_silently=False,
                         )
+                    
+                    self.send_email_async(email_log.id, send_bulk_email)
                 
-                self.send_email_async(
-                    send_bulk_emails,
-                    f'Emails masivos enviados a {test_users.count()} usuarios',
-                    'Error enviando emails masivos'
-                )
-                messages.success(request, f'✓ Envío masivo en proceso a {test_users.count()} usuarios. Los emails se enviarán en segundo plano.')
+                messages.success(request, f'Envío masivo en proceso a {test_users.count()} usuarios. Revisa el estado abajo.')
             
             else:
                 messages.error(request, 'Tipo de prueba no válido')
                 
         except socket.timeout:
-            messages.error(request, '✗ Timeout enviando email. El servidor SMTP no responde a tiempo. Verifica tu configuración.')
+            messages.error(request, 'Timeout enviando email. El servidor SMTP no responde a tiempo.')
         except Exception as e:
-            messages.error(request, f'✗ Error: {str(e)}')
+            messages.error(request, f'Error: {str(e)}')
         
         return redirect('tickets:admin_email_test')
