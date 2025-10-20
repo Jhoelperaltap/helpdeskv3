@@ -509,14 +509,35 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                 'suggestions': ['Verifica configuración en .env']
             }
 
+    def send_email_async(self, email_func, success_message, error_prefix):
+        """
+        Envía email en un thread separado para evitar timeouts en producción
+        """
+        import threading
+        
+        def send_in_background():
+            try:
+                email_func()
+                print(f"[v0] Email enviado exitosamente: {success_message}")
+            except Exception as e:
+                print(f"[v0] Error enviando email: {error_prefix} - {str(e)}")
+        
+        thread = threading.Thread(target=send_in_background)
+        thread.daemon = True
+        thread.start()
+
     def post(self, request, *args, **kwargs):
-        """Manejar envío de emails con timeouts cortos"""
+        """Manejar envío de emails con envío asíncrono para evitar timeouts"""
         from django.core.mail import send_mail, EmailMessage, get_connection
         from django.conf import settings
         import os
         
         test_type = request.POST.get('test_type')
         recipient_email = request.POST.get('recipient_email', 'test@example.com')
+        
+        if not recipient_email or '@' not in recipient_email:
+            messages.error(request, 'Email de destino inválido')
+            return redirect('tickets:admin_email_test')
         
         try:
             smtp_connection = get_connection(
@@ -526,14 +547,14 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                 username=os.environ.get('EMAIL_HOST_USER', settings.EMAIL_HOST_USER),
                 password=os.environ.get('EMAIL_HOST_PASSWORD', settings.EMAIL_HOST_PASSWORD),
                 use_tls=os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true',
-                timeout=10,  # Timeout de 10 segundos
+                timeout=15,  # Aumentado timeout a 15 segundos
             )
         except Exception as e:
             messages.error(request, f'Error creando conexión SMTP: {str(e)}')
             return redirect('tickets:admin_email_test')
         
         if not smtp_connection.username or not smtp_connection.password:
-            messages.error(request, 'Configuración SMTP incompleta')
+            messages.error(request, 'Configuración SMTP incompleta. Verifica EMAIL_HOST_USER y EMAIL_HOST_PASSWORD en .env')
             return redirect('tickets:admin_email_test')
         
         try:
@@ -545,45 +566,167 @@ class EmailTestView(SuperAdminRequiredMixin, ListView):
                 sock.close()
                 
                 if result == 0:
-                    messages.success(request, f'Conexión SMTP exitosa a {smtp_connection.host}:{smtp_connection.port}')
+                    messages.success(request, f'✓ Conexión SMTP exitosa a {smtp_connection.host}:{smtp_connection.port}')
                 else:
-                    messages.error(request, f'No se puede conectar al puerto {smtp_connection.port}')
+                    messages.error(request, f'✗ No se puede conectar al puerto {smtp_connection.port}. Verifica firewall y configuración.')
                 return redirect('tickets:admin_email_test')
             
+            from_email = os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
+            
             if test_type == 'basic':
-                send_mail(
-                    subject='[Helpdesk] Prueba Básica SMTP',
-                    message=f'Email de prueba desde {smtp_connection.host}',
-                    from_email=os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL),
-                    recipient_list=[recipient_email],
-                    connection=smtp_connection,
-                    fail_silently=False,
+                def send_basic_email():
+                    send_mail(
+                        subject='[Helpdesk] Prueba Básica SMTP',
+                        message=f'Este es un email de prueba enviado desde el sistema Helpdesk.\n\nConfiguración SMTP:\n- Host: {smtp_connection.host}\n- Puerto: {smtp_connection.port}\n- Usuario: {smtp_connection.username}\n\nSi recibes este email, la configuración SMTP está funcionando correctamente.',
+                        from_email=from_email,
+                        recipient_list=[recipient_email],
+                        connection=smtp_connection,
+                        fail_silently=False,
+                    )
+                
+                self.send_email_async(
+                    send_basic_email,
+                    f'Email básico enviado a {recipient_email}',
+                    'Error enviando email básico'
                 )
-                messages.success(request, f'Email enviado a {recipient_email}')
+                messages.success(request, f'✓ Email básico en proceso de envío a {recipient_email}. Verifica tu bandeja de entrada en unos momentos.')
                 
             elif test_type == 'html':
-                html_content = f"""
-                <html><body>
-                <h1>Prueba HTML SMTP</h1>
-                <p>Configuración: {smtp_connection.host}:{smtp_connection.port}</p>
-                <p>Usuario: {smtp_connection.username}</p>
-                </body></html>
-                """
+                def send_html_email():
+                    html_content = f"""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>
+                            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                            .header {{ background: #4F46E5; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
+                            .content {{ background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }}
+                            .info-box {{ background: white; padding: 15px; margin: 15px 0; border-left: 4px solid #4F46E5; }}
+                            .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h1>✓ Prueba HTML SMTP</h1>
+                            </div>
+                            <div class="content">
+                                <p>Este es un email de prueba con formato HTML enviado desde el sistema Helpdesk.</p>
+                                
+                                <div class="info-box">
+                                    <h3>Configuración SMTP</h3>
+                                    <p><strong>Host:</strong> {smtp_connection.host}</p>
+                                    <p><strong>Puerto:</strong> {smtp_connection.port}</p>
+                                    <p><strong>Usuario:</strong> {smtp_connection.username}</p>
+                                    <p><strong>TLS:</strong> {'Activado' if smtp_connection.use_tls else 'Desactivado'}</p>
+                                </div>
+                                
+                                <p>Si recibes este email con el formato correcto, tu configuración SMTP está funcionando perfectamente.</p>
+                            </div>
+                            <div class="footer">
+                                <p>Sistema Helpdesk - Prueba de Email</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    
+                    email = EmailMessage(
+                        subject='[Helpdesk] Prueba HTML SMTP',
+                        body=html_content,
+                        from_email=from_email,
+                        to=[recipient_email],
+                        connection=smtp_connection,
+                    )
+                    email.content_subtype = 'html'
+                    email.send()
                 
-                email = EmailMessage(
-                    subject='[Helpdesk] Prueba HTML SMTP',
-                    body=html_content,
-                    from_email=os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL),
-                    to=[recipient_email],
-                    connection=smtp_connection,
+                self.send_email_async(
+                    send_html_email,
+                    f'Email HTML enviado a {recipient_email}',
+                    'Error enviando email HTML'
                 )
-                email.content_subtype = 'html'
-                email.send()
-                messages.success(request, f'Email HTML enviado a {recipient_email}')
+                messages.success(request, f'✓ Email HTML en proceso de envío a {recipient_email}. Verifica tu bandeja de entrada en unos momentos.')
+            
+            elif test_type == 'ticket_notification':
+                def send_ticket_notification():
+                    html_content = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>
+                            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                            .header { background: #EF4444; color: white; padding: 20px; text-align: center; }
+                            .ticket-info { background: #f9fafb; padding: 20px; margin: 20px 0; }
+                            .ticket-info p { margin: 10px 0; }
+                            .button { display: inline-block; padding: 12px 24px; background: #4F46E5; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h1>🎫 Nuevo Ticket Creado</h1>
+                            </div>
+                            <div class="ticket-info">
+                                <p><strong>Ticket #:</strong> TEST-001</p>
+                                <p><strong>Asunto:</strong> Prueba de notificación de ticket</p>
+                                <p><strong>Prioridad:</strong> Alta</p>
+                                <p><strong>Estado:</strong> Abierto</p>
+                                <p><strong>Creado por:</strong> Sistema de Pruebas</p>
+                            </div>
+                            <p>Este es un ejemplo de cómo se verán las notificaciones automáticas de tickets.</p>
+                            <a href="#" class="button">Ver Ticket</a>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    
+                    email = EmailMessage(
+                        subject='[Helpdesk] Nuevo Ticket #TEST-001',
+                        body=html_content,
+                        from_email=from_email,
+                        to=[recipient_email],
+                        connection=smtp_connection,
+                    )
+                    email.content_subtype = 'html'
+                    email.send()
+                
+                self.send_email_async(
+                    send_ticket_notification,
+                    f'Notificación de ticket enviada a {recipient_email}',
+                    'Error enviando notificación de ticket'
+                )
+                messages.success(request, f'✓ Notificación de ticket en proceso de envío a {recipient_email}. Verifica tu bandeja de entrada en unos momentos.')
+            
+            elif test_type == 'bulk':
+                test_users = User.objects.filter(is_active=True, role='SUPERADMIN')[:3]
+                
+                def send_bulk_emails():
+                    for user in test_users:
+                        send_mail(
+                            subject='[Helpdesk] Prueba de Envío Masivo',
+                            message=f'Hola {user.get_full_name()},\n\nEste es un email de prueba masiva del sistema Helpdesk.',
+                            from_email=from_email,
+                            recipient_list=[user.email],
+                            connection=smtp_connection,
+                            fail_silently=False,
+                        )
+                
+                self.send_email_async(
+                    send_bulk_emails,
+                    f'Emails masivos enviados a {test_users.count()} usuarios',
+                    'Error enviando emails masivos'
+                )
+                messages.success(request, f'✓ Envío masivo en proceso a {test_users.count()} usuarios. Los emails se enviarán en segundo plano.')
+            
+            else:
+                messages.error(request, 'Tipo de prueba no válido')
                 
         except socket.timeout:
-            messages.error(request, 'Timeout enviando email. Verifica configuración SMTP.')
+            messages.error(request, '✗ Timeout enviando email. El servidor SMTP no responde a tiempo. Verifica tu configuración.')
         except Exception as e:
-            messages.error(request, f'Error: {str(e)}')
+            messages.error(request, f'✗ Error: {str(e)}')
         
         return redirect('tickets:admin_email_test')
