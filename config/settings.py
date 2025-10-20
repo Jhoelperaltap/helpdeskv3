@@ -12,6 +12,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-!2y30pg(6w41wl0op)k$m
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes', 'on']
 ALLOWED_HOSTS =  os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
+CSRF_TRUSTED_ORIGINS = ['https://ejsupportit.com','https://www.ejsupportit.com','https://127.0.0.1','http://127.0.0.1','https://148.230.83.208']
 
 if not DEBUG and os.environ.get('ENVIRONMENT') == 'production':
     SECURE_SSL_REDIRECT = True
