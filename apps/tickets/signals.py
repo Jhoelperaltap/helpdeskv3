@@ -3,107 +3,183 @@ from django.dispatch import receiver
 from django.core.mail import send_mail, get_connection, EmailMessage
 from django.conf import settings
 from django.utils import timezone
-from .models import Ticket, TicketMessage, EscalationSettings
+from .models import Ticket, TicketMessage, EscalationSettings, EmailLog
 from .tasks import update_ticket_escalation_times, pause_escalation_on_response
 import logging
 import os
+import threading
+import smtplib
 
 logger = logging.getLogger(__name__)
+
+def send_ticket_notification_async(ticket_id, ticket_reference, ticket_title, ticket_priority, 
+                                   ticket_description, company_name, created_by_name, 
+                                   created_by_email, created_at):
+    """
+    Envía notificación de ticket de forma asíncrona para evitar timeouts
+    """
+    try:
+        # Configuración SMTP desde .env
+        smtp_host = os.environ.get('EMAIL_HOST', settings.EMAIL_HOST)
+        smtp_port = int(os.environ.get('EMAIL_PORT', settings.EMAIL_PORT))
+        smtp_user = os.environ.get('EMAIL_HOST_USER', settings.EMAIL_HOST_USER)
+        smtp_password = os.environ.get('EMAIL_HOST_PASSWORD', settings.EMAIL_HOST_PASSWORD)
+        from_email = os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
+        admin_email = os.environ.get('ADMIN_EMAIL', settings.ADMIN_EMAIL)
+        
+        # Verificar configuración
+        if not smtp_user or not smtp_password or not admin_email:
+            raise ValueError('Configuración SMTP incompleta')
+        
+        # Determinar si usar SSL o TLS basado en el puerto
+        use_ssl = smtp_port == 465
+        use_tls = smtp_port == 587
+        
+        # Crear log de email
+        email_log = EmailLog.objects.create(
+            email_type='ticket_notification',
+            recipient=admin_email,
+            subject=f'[Helpdesk] Nuevo Ticket #{ticket_reference} - {ticket_title}',
+            status='sending',
+            smtp_host=smtp_host,
+            smtp_port=smtp_port
+        )
+        
+        # Crear email HTML profesional
+        priority_map = {
+            'LOW': 'Baja',
+            'MEDIUM': 'Media',
+            'HIGH': 'Alta',
+            'URGENT': 'Urgente'
+        }
+        priority_display = priority_map.get(ticket_priority, ticket_priority)
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Nuevo Ticket Creado</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
+                .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                .header {{ background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px 20px; text-align: center; }}
+                .content {{ padding: 30px; }}
+                .ticket-box {{ background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+                .priority-high {{ color: #dc2626; font-weight: bold; }}
+                .priority-medium {{ color: #d97706; font-weight: bold; }}
+                .priority-low {{ color: #059669; font-weight: bold; }}
+                .priority-urgent {{ color: #991b1b; font-weight: bold; }}
+                .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Nuevo Ticket Creado</h1>
+                    <p>Sistema de Helpdesk - Notificación Automática</p>
+                </div>
+                <div class="content">
+                    <p>Se ha creado un nuevo ticket en el sistema:</p>
+                    
+                    <div class="ticket-box">
+                        <h3 style="margin-top: 0; color: #374151;">#{ticket_reference} - {ticket_title}</h3>
+                        <p><strong>Prioridad:</strong> <span class="priority-{ticket_priority.lower()}">{priority_display}</span></p>
+                        <p><strong>Empresa:</strong> {company_name}</p>
+                        <p><strong>Creado por:</strong> {created_by_name}</p>
+                        <p><strong>Email:</strong> {created_by_email or 'No especificado'}</p>
+                        <p><strong>Fecha:</strong> {created_at}</p>
+                        
+                        <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
+                            <p style="margin: 0;"><strong>Descripción:</strong></p>
+                            <p style="margin: 5px 0 0 0; color: #6b7280;">{ticket_description}</p>
+                        </div>
+                    </div>
+                    
+                    <p>Puedes ver y gestionar este ticket accediendo al sistema de helpdesk.</p>
+                </div>
+                <div class="footer">
+                    <p><strong>Sistema Helpdesk</strong></p>
+                    <p style="font-size: 12px;">Este es un email automático, no responder.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Enviar email HTML
+        email = EmailMessage(
+            subject=f'[Helpdesk] Nuevo Ticket #{ticket_reference} - {ticket_title}',
+            body=html_content,
+            from_email=from_email,
+            to=[admin_email],
+            connection=get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=smtp_host,
+                port=smtp_port,
+                username=smtp_user,
+                password=smtp_password,
+                use_ssl=use_ssl,
+                use_tls=use_tls,
+                timeout=60,  # Timeout de 60 segundos para producción
+            ),
+        )
+        email.content_subtype = 'html'
+        email.send()
+        
+        # Actualizar log como exitoso
+        email_log.status = 'sent'
+        email_log.sent_at = timezone.now()
+        email_log.save()
+        
+        logger.info(f'Notificación enviada para ticket {ticket_reference} a {admin_email}')
+        
+    except smtplib.SMTPException as e:
+        error_msg = f'Error SMTP: {str(e)}'
+        email_log.status = 'failed'
+        email_log.error_message = error_msg
+        email_log.save()
+        logger.error(f'Error SMTP enviando notificación para ticket {ticket_reference}: {error_msg}')
+        
+    except Exception as e:
+        error_msg = str(e)
+        email_log.status = 'failed'
+        email_log.error_message = error_msg
+        email_log.save()
+        logger.error(f'Error enviando notificación para ticket {ticket_reference}: {error_msg}')
+        
+    except Exception as e:
+        logger.error(f'Error crítico en envío asíncrono de notificación: {str(e)}')
 
 @receiver(post_save, sender=Ticket)
 def ticket_created(sender, instance, created, **kwargs):
     """
     Signal handler for when a ticket is created.
-    Sends email notification using SMTP configuration from .env
+    Sends email notification asynchronously to avoid timeouts
     """
     if created:
         try:
-            smtp_connection = get_connection(
-                backend='django.core.mail.backends.smtp.EmailBackend',
-                host=os.environ.get('EMAIL_HOST', settings.EMAIL_HOST),
-                port=int(os.environ.get('EMAIL_PORT', settings.EMAIL_PORT)),
-                username=os.environ.get('EMAIL_HOST_USER', settings.EMAIL_HOST_USER),
-                password=os.environ.get('EMAIL_HOST_PASSWORD', settings.EMAIL_HOST_PASSWORD),
-                use_tls=os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true',
+            thread = threading.Thread(
+                target=send_ticket_notification_async,
+                args=(
+                    instance.id,
+                    instance.reference,
+                    instance.title,
+                    instance.priority,
+                    instance.description,
+                    instance.company.name,
+                    instance.created_by.get_full_name() or instance.created_by.username,
+                    instance.created_by.email,
+                    instance.created_at.strftime('%d/%m/%Y %H:%M'),
+                ),
+                daemon=True
             )
+            thread.start()
             
-            # Verificar que tenemos configuración SMTP
-            if not smtp_connection.username or not smtp_connection.password:
-                logger.warning(f'Configuración SMTP incompleta para notificación de ticket {instance.reference}')
-                return
-            
-            # Crear email HTML profesional
-            html_content = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>🎫 Nuevo Ticket Creado</title>
-                <style>
-                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
-                    .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-                    .header {{ background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px 20px; text-align: center; }}
-                    .content {{ padding: 30px; }}
-                    .ticket-box {{ background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; }}
-                    .priority-high {{ color: #dc2626; font-weight: bold; }}
-                    .priority-medium {{ color: #d97706; font-weight: bold; }}
-                    .priority-low {{ color: #059669; font-weight: bold; }}
-                    .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>🎫 Nuevo Ticket Creado</h1>
-                        <p>Sistema de Helpdesk - Notificación Automática</p>
-                    </div>
-                    <div class="content">
-                        <p>Se ha creado un nuevo ticket en el sistema:</p>
-                        
-                        <div class="ticket-box">
-                            <h3 style="margin-top: 0; color: #374151;">#{instance.reference} - {instance.title}</h3>
-                            <p><strong>Prioridad:</strong> <span class="priority-{instance.priority.lower()}">{instance.get_priority_display()}</span></p>
-                            <p><strong>Empresa:</strong> {instance.company.name}</p>
-                            <p><strong>Creado por:</strong> {instance.created_by.get_full_name() or instance.created_by.username}</p>
-                            <p><strong>Email:</strong> {instance.created_by.email or 'No especificado'}</p>
-                            <p><strong>Fecha:</strong> {instance.created_at.strftime('%d/%m/%Y %H:%M')}</p>
-                            
-                            <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
-                                <p style="margin: 0;"><strong>Descripción:</strong></p>
-                                <p style="margin: 5px 0 0 0; color: #6b7280;">{instance.description}</p>
-                            </div>
-                        </div>
-                        
-                        <p>Puedes ver y gestionar este ticket accediendo al sistema de helpdesk.</p>
-                    </div>
-                    <div class="footer">
-                        <p><strong>Sistema Helpdesk</strong></p>
-                        <p style="font-size: 12px;">Este es un email automático, no responder.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-            
-            # Enviar email HTML
-            admin_email = getattr(settings, 'ADMIN_EMAIL', None) or os.environ.get('ADMIN_EMAIL')
-            if admin_email:
-                email = EmailMessage(
-                    subject=f'[Helpdesk] 🎫 Nuevo Ticket #{instance.reference} - {instance.title}',
-                    body=html_content,
-                    from_email=os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL),
-                    to=[admin_email],
-                    connection=smtp_connection,
-                )
-                email.content_subtype = 'html'
-                email.send()
-                
-                logger.info(f'Notificación HTML enviada para ticket {instance.reference} a {admin_email}')
-            else:
-                logger.warning(f'No se encontró ADMIN_EMAIL para notificación de ticket {instance.reference}')
+            logger.info(f'Notificación programada para ticket {instance.reference}')
             
         except Exception as e:
-            logger.error(f'Error enviando notificación para ticket {instance.reference}: {str(e)}')
+            logger.error(f'Error programando notificación para ticket {instance.reference}: {str(e)}')
 
 @receiver(post_save, sender=Ticket)
 def handle_ticket_escalation_on_create(sender, instance, created, **kwargs):
