@@ -17,6 +17,7 @@ def send_ticket_notification_async(ticket_id, ticket_reference, ticket_title, ti
                                    created_by_email, created_at):
     """
     Envía notificación de ticket de forma asíncrona para evitar timeouts
+    Envía emails tanto al admin como al usuario que creó el ticket
     """
     try:
         # Configuración SMTP desde .env
@@ -28,24 +29,25 @@ def send_ticket_notification_async(ticket_id, ticket_reference, ticket_title, ti
         admin_email = os.environ.get('ADMIN_EMAIL', settings.ADMIN_EMAIL)
         
         # Verificar configuración
-        if not smtp_user or not smtp_password or not admin_email:
+        if not smtp_user or not smtp_password:
             raise ValueError('Configuración SMTP incompleta')
         
         # Determinar si usar SSL o TLS basado en el puerto
         use_ssl = smtp_port == 465
         use_tls = smtp_port == 587
         
-        # Crear log de email
-        email_log = EmailLog.objects.create(
-            email_type='ticket_notification',
-            recipient=admin_email,
-            subject=f'[Helpdesk] Nuevo Ticket #{ticket_reference} - {ticket_title}',
-            status='sending',
-            smtp_host=smtp_host,
-            smtp_port=smtp_port
+        # Crear conexión SMTP reutilizable
+        connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=smtp_host,
+            port=smtp_port,
+            username=smtp_user,
+            password=smtp_password,
+            use_ssl=use_ssl,
+            use_tls=use_tls,
+            timeout=60,
         )
         
-        # Crear email HTML profesional
         priority_map = {
             'LOW': 'Baja',
             'MEDIUM': 'Media',
@@ -54,102 +56,188 @@ def send_ticket_notification_async(ticket_id, ticket_reference, ticket_title, ti
         }
         priority_display = priority_map.get(ticket_priority, ticket_priority)
         
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Nuevo Ticket Creado</title>
-            <style>
-                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
-                .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-                .header {{ background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px 20px; text-align: center; }}
-                .content {{ padding: 30px; }}
-                .ticket-box {{ background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; }}
-                .priority-high {{ color: #dc2626; font-weight: bold; }}
-                .priority-medium {{ color: #d97706; font-weight: bold; }}
-                .priority-low {{ color: #059669; font-weight: bold; }}
-                .priority-urgent {{ color: #991b1b; font-weight: bold; }}
-                .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>Nuevo Ticket Creado</h1>
-                    <p>Sistema de Helpdesk - Notificación Automática</p>
-                </div>
-                <div class="content">
-                    <p>Se ha creado un nuevo ticket en el sistema:</p>
-                    
-                    <div class="ticket-box">
-                        <h3 style="margin-top: 0; color: #374151;">#{ticket_reference} - {ticket_title}</h3>
-                        <p><strong>Prioridad:</strong> <span class="priority-{ticket_priority.lower()}">{priority_display}</span></p>
-                        <p><strong>Empresa:</strong> {company_name}</p>
-                        <p><strong>Creado por:</strong> {created_by_name}</p>
-                        <p><strong>Email:</strong> {created_by_email or 'No especificado'}</p>
-                        <p><strong>Fecha:</strong> {created_at}</p>
-                        
-                        <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
-                            <p style="margin: 0;"><strong>Descripción:</strong></p>
-                            <p style="margin: 5px 0 0 0; color: #6b7280;">{ticket_description}</p>
-                        </div>
+        if admin_email:
+            email_log_admin = EmailLog.objects.create(
+                email_type='ticket_notification',
+                recipient=admin_email,
+                subject=f'[Helpdesk] Nuevo Ticket #{ticket_reference} - {ticket_title}',
+                status='sending',
+                smtp_host=smtp_host,
+                smtp_port=smtp_port
+            )
+            
+            html_admin = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Nuevo Ticket Creado</title>
+                <style>
+                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
+                    .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                    .header {{ background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px 20px; text-align: center; }}
+                    .content {{ padding: 30px; }}
+                    .ticket-box {{ background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+                    .priority-high {{ color: #dc2626; font-weight: bold; }}
+                    .priority-medium {{ color: #d97706; font-weight: bold; }}
+                    .priority-low {{ color: #059669; font-weight: bold; }}
+                    .priority-urgent {{ color: #991b1b; font-weight: bold; }}
+                    .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🎫 Nuevo Ticket Creado</h1>
+                        <p>Sistema de Helpdesk - Notificación para Administrador</p>
                     </div>
-                    
-                    <p>Puedes ver y gestionar este ticket accediendo al sistema de helpdesk.</p>
+                    <div class="content">
+                        <p>Se ha creado un nuevo ticket en el sistema que requiere atención:</p>
+                        
+                        <div class="ticket-box">
+                            <h3 style="margin-top: 0; color: #374151;">#{ticket_reference} - {ticket_title}</h3>
+                            <p><strong>Prioridad:</strong> <span class="priority-{ticket_priority.lower()}">{priority_display}</span></p>
+                            <p><strong>Empresa:</strong> {company_name}</p>
+                            <p><strong>Creado por:</strong> {created_by_name}</p>
+                            <p><strong>Email:</strong> {created_by_email or 'No especificado'}</p>
+                            <p><strong>Fecha:</strong> {created_at}</p>
+                            
+                            <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
+                                <p style="margin: 0;"><strong>Descripción del Problema:</strong></p>
+                                <p style="margin: 5px 0 0 0; color: #6b7280;">{ticket_description}</p>
+                            </div>
+                        </div>
+                        
+                        <p style="margin-top: 20px;">Accede al sistema de helpdesk para revisar y asignar este ticket.</p>
+                    </div>
+                    <div class="footer">
+                        <p><strong>Sistema Helpdesk</strong></p>
+                        <p style="font-size: 12px;">Este es un email automático, no responder.</p>
+                    </div>
                 </div>
-                <div class="footer">
-                    <p><strong>Sistema Helpdesk</strong></p>
-                    <p style="font-size: 12px;">Este es un email automático, no responder.</p>
+            </body>
+            </html>
+            """
+            
+            try:
+                email_admin = EmailMessage(
+                    subject=f'[Helpdesk] Nuevo Ticket #{ticket_reference} - {ticket_title}',
+                    body=html_admin,
+                    from_email=from_email,
+                    to=[admin_email],
+                    connection=connection,
+                )
+                email_admin.content_subtype = 'html'
+                email_admin.send()
+                
+                email_log_admin.status = 'sent'
+                email_log_admin.sent_at = timezone.now()
+                email_log_admin.save()
+                
+                logger.info(f'Notificación enviada al admin para ticket {ticket_reference}')
+            except Exception as e:
+                email_log_admin.status = 'failed'
+                email_log_admin.error_message = str(e)
+                email_log_admin.save()
+                logger.error(f'Error enviando notificación al admin: {str(e)}')
+        
+        if created_by_email:
+            email_log_user = EmailLog.objects.create(
+                email_type='ticket_confirmation',
+                recipient=created_by_email,
+                subject=f'[Helpdesk] Ticket Creado #{ticket_reference} - {ticket_title}',
+                status='sending',
+                smtp_host=smtp_host,
+                smtp_port=smtp_port
+            )
+            
+            html_user = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Ticket Creado Exitosamente</title>
+                <style>
+                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
+                    .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                    .header {{ background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px 20px; text-align: center; }}
+                    .content {{ padding: 30px; }}
+                    .ticket-box {{ background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #10b981; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+                    .priority-high {{ color: #dc2626; font-weight: bold; }}
+                    .priority-medium {{ color: #d97706; font-weight: bold; }}
+                    .priority-low {{ color: #059669; font-weight: bold; }}
+                    .priority-urgent {{ color: #991b1b; font-weight: bold; }}
+                    .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
+                    .success-icon {{ font-size: 48px; margin-bottom: 10px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="success-icon">✅</div>
+                        <h1>Ticket Creado Exitosamente</h1>
+                        <p>Tu solicitud ha sido registrada</p>
+                    </div>
+                    <div class="content">
+                        <p>Hola <strong>{created_by_name}</strong>,</p>
+                        <p>Tu ticket ha sido creado exitosamente en nuestro sistema de soporte. Nuestro equipo lo revisará y te responderá lo antes posible.</p>
+                        
+                        <div class="ticket-box">
+                            <h3 style="margin-top: 0; color: #374151;">Detalles de tu Ticket</h3>
+                            <p><strong>Número de Ticket:</strong> #{ticket_reference}</p>
+                            <p><strong>Título:</strong> {ticket_title}</p>
+                            <p><strong>Prioridad:</strong> <span class="priority-{ticket_priority.lower()}">{priority_display}</span></p>
+                            <p><strong>Fecha de Creación:</strong> {created_at}</p>
+                            
+                            <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
+                                <p style="margin: 0;"><strong>Tu Problema:</strong></p>
+                                <p style="margin: 5px 0 0 0; color: #6b7280;">{ticket_description}</p>
+                            </div>
+                        </div>
+                        
+                        <p><strong>¿Qué sigue?</strong></p>
+                        <ul style="color: #6b7280;">
+                            <li>Nuestro equipo revisará tu ticket</li>
+                            <li>Te asignaremos un técnico especializado</li>
+                            <li>Recibirás actualizaciones por email</li>
+                            <li>Puedes seguir el progreso en el sistema</li>
+                        </ul>
+                        
+                        <p style="margin-top: 20px;">Guarda este número de ticket para futuras referencias: <strong>#{ticket_reference}</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p><strong>Sistema Helpdesk</strong></p>
+                        <p style="font-size: 12px;">Si tienes preguntas, responde a este email o contacta a soporte.</p>
+                    </div>
                 </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        # Enviar email HTML
-        email = EmailMessage(
-            subject=f'[Helpdesk] Nuevo Ticket #{ticket_reference} - {ticket_title}',
-            body=html_content,
-            from_email=from_email,
-            to=[admin_email],
-            connection=get_connection(
-                backend='django.core.mail.backends.smtp.EmailBackend',
-                host=smtp_host,
-                port=smtp_port,
-                username=smtp_user,
-                password=smtp_password,
-                use_ssl=use_ssl,
-                use_tls=use_tls,
-                timeout=60,  # Timeout de 60 segundos para producción
-            ),
-        )
-        email.content_subtype = 'html'
-        email.send()
-        
-        # Actualizar log como exitoso
-        email_log.status = 'sent'
-        email_log.sent_at = timezone.now()
-        email_log.save()
-        
-        logger.info(f'Notificación enviada para ticket {ticket_reference} a {admin_email}')
-        
-    except smtplib.SMTPException as e:
-        error_msg = f'Error SMTP: {str(e)}'
-        email_log.status = 'failed'
-        email_log.error_message = error_msg
-        email_log.save()
-        logger.error(f'Error SMTP enviando notificación para ticket {ticket_reference}: {error_msg}')
+            </body>
+            </html>
+            """
+            
+            try:
+                email_user = EmailMessage(
+                    subject=f'[Helpdesk] Ticket Creado #{ticket_reference} - {ticket_title}',
+                    body=html_user,
+                    from_email=from_email,
+                    to=[created_by_email],
+                    connection=connection,
+                )
+                email_user.content_subtype = 'html'
+                email_user.send()
+                
+                email_log_user.status = 'sent'
+                email_log_user.sent_at = timezone.now()
+                email_log_user.save()
+                
+                logger.info(f'Confirmación enviada al usuario {created_by_email} para ticket {ticket_reference}')
+            except Exception as e:
+                email_log_user.status = 'failed'
+                email_log_user.error_message = str(e)
+                email_log_user.save()
+                logger.error(f'Error enviando confirmación al usuario: {str(e)}')
         
     except Exception as e:
-        error_msg = str(e)
-        email_log.status = 'failed'
-        email_log.error_message = error_msg
-        email_log.save()
-        logger.error(f'Error enviando notificación para ticket {ticket_reference}: {error_msg}')
-        
-    except Exception as e:
-        logger.error(f'Error crítico en envío asíncrono de notificación: {str(e)}')
+        logger.error(f'Error crítico en envío asíncrono de notificaciones: {str(e)}')
 
 @receiver(post_save, sender=Ticket)
 def ticket_created(sender, instance, created, **kwargs):
