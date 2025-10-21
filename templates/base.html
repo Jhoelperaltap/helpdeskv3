@@ -96,18 +96,38 @@
                 </div>
               {% endif %}
               
-              <!-- Added user info and logout button for authenticated users -->
+              <!-- Agregando dropdown de perfil de usuario -->
               <div class='flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200'>
-                <div class='flex items-center space-x-2'>
-                  <div class='w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center'>
-                    <i class='fas fa-user text-white text-sm'></i>
+                <div class='relative group'>
+                  <button class='flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-blue-50 transition-all duration-200'>
+                    <div class='w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center'>
+                      <i class='fas fa-user text-white text-sm'></i>
+                    </div>
+                    <div class='text-left'>
+                      <span class='text-sm font-medium text-gray-700 block'>{{ user.get_full_name|default:user.username }}</span>
+                      <span class='text-xs text-gray-500'>{{ user.get_role_display }}</span>
+                    </div>
+                    <i class='fas fa-chevron-down text-xs text-gray-500'></i>
+                  </button>
+                  
+                  <div class='absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50'>
+                    <div class='py-2'>
+                      <a href='{% url "users:user_profile" %}' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600'>
+                        <i class='fas fa-user-circle w-4'></i>
+                        <span>Mi Perfil</span>
+                      </a>
+                      <a href='{% url "users:user_change_password" %}' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600'>
+                        <i class='fas fa-key w-4'></i>
+                        <span>Cambiar Contraseña</span>
+                      </a>
+                      <div class='border-t border-gray-100 my-1'></div>
+                      <a href='{% url "users:logout" %}' class='flex items-center space-x-3 px-4 py-2 text-red-600 hover:bg-red-50'>
+                        <i class='fas fa-sign-out-alt w-4'></i>
+                        <span>Cerrar Sesión</span>
+                      </a>
+                    </div>
                   </div>
-                  <span class='text-sm font-medium text-gray-700'>{{ user.get_full_name|default:user.username }}</span>
                 </div>
-                <a href='{% url "users:logout" %}' class='flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg'>
-                  <i class='fas fa-sign-out-alt'></i>
-                  <span class='font-medium'>Cerrar Sesión</span>
-                </a>
               </div>
             {% else %}
               <!-- Show login and register buttons for non-authenticated users -->
@@ -181,10 +201,39 @@
                 </div>
               {% endif %}
               
-              <a href='{% url "users:logout" %}' class='flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg'>
-                <i class='fas fa-sign-out-alt w-5'></i>
-                <span>Cerrar Sesión</span>
-              </a>
+              <!-- Agregando dropdown de perfil de usuario en móvil -->
+              <div class='flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200'>
+                <div class='relative group'>
+                  <button class='flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-blue-50 transition-all duration-200'>
+                    <div class='w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center'>
+                      <i class='fas fa-user text-white text-sm'></i>
+                    </div>
+                    <div class='text-left'>
+                      <span class='text-sm font-medium text-gray-700 block'>{{ user.get_full_name|default:user.username }}</span>
+                      <span class='text-xs text-gray-500'>{{ user.get_role_display }}</span>
+                    </div>
+                    <i class='fas fa-chevron-down text-xs text-gray-500'></i>
+                  </button>
+                  
+                  <div class='absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50'>
+                    <div class='py-2'>
+                      <a href='{% url "users:user_profile" %}' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600'>
+                        <i class='fas fa-user-circle w-4'></i>
+                        <span>Mi Perfil</span>
+                      </a>
+                      <a href='{% url "users:user_change_password" %}' class='flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600'>
+                        <i class='fas fa-key w-4'></i>
+                        <span>Cambiar Contraseña</span>
+                      </a>
+                      <div class='border-t border-gray-100 my-1'></div>
+                      <a href='{% url "users:logout" %}' class='flex items-center space-x-3 px-4 py-2 text-red-600 hover:bg-red-50'>
+                        <i class='fas fa-sign-out-alt w-4'></i>
+                        <span>Cerrar Sesión</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
             {% else %}
               <!-- Mobile menu for non-authenticated users -->
               <a href='/users/login/' class='flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg'>

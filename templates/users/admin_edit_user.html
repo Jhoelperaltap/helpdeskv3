@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Editar Usuario - E&J TI{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-8">
+    <div class="container mx-auto px-4 max-w-2xl">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">
+                <i class="fas fa-user-edit mr-3 text-blue-400"></i>
+                Editar Usuario
+            </h1>
+            <p class="text-gray-300">Modifica la información del usuario</p>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 p-8 shadow-2xl">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                    <div class="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-lg">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- Username -->
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">
+                        <i class="fas fa-user mr-2"></i>Nombre de Usuario *
+                    </label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                        <p class="text-red-400 text-sm mt-1">{{ form.username.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- First Name & Last Name -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-white text-sm font-medium mb-2">
+                            <i class="fas fa-id-card mr-2"></i>Nombre *
+                        </label>
+                        {{ form.first_name }}
+                        {% if form.first_name.errors %}
+                            <p class="text-red-400 text-sm mt-1">{{ form.first_name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-white text-sm font-medium mb-2">
+                            <i class="fas fa-id-card mr-2"></i>Apellido *
+                        </label>
+                        {{ form.last_name }}
+                        {% if form.last_name.errors %}
+                            <p class="text-red-400 text-sm mt-1">{{ form.last_name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Email -->
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">
+                        <i class="fas fa-envelope mr-2"></i>Email *
+                    </label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <p class="text-red-400 text-sm mt-1">{{ form.email.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Role & Company -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-white text-sm font-medium mb-2">
+                            <i class="fas fa-user-tag mr-2"></i>Rol *
+                        </label>
+                        {{ form.role }}
+                        {% if form.role.errors %}
+                            <p class="text-red-400 text-sm mt-1">{{ form.role.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-white text-sm font-medium mb-2">
+                            <i class="fas fa-building mr-2"></i>Empresa
+                        </label>
+                        {{ form.company }}
+                        {% if form.company.errors %}
+                            <p class="text-red-400 text-sm mt-1">{{ form.company.errors.0 }}</p>
+                        {% endif %}
+                        <p class="text-gray-400 text-xs mt-1">{{ form.company.help_text }}</p>
+                    </div>
+                </div>
+
+                <!-- Is Active -->
+                <div class="flex items-center">
+                    {{ form.is_active }}
+                    <label class="ml-2 text-white text-sm">
+                        Usuario activo
+                    </label>
+                    {% if form.is_active.errors %}
+                        <p class="text-red-400 text-sm mt-1">{{ form.is_active.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <p class="text-gray-400 text-xs">{{ form.is_active.help_text }}</p>
+
+                <!-- Buttons -->
+                <div class="flex gap-4 pt-4">
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
+                        <i class="fas fa-save mr-2"></i>
+                        Guardar Cambios
+                    </button>
+                    <a href="{% url 'users:admin_user_list' %}" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors text-center">
+                        <i class="fas fa-times mr-2"></i>
+                        Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 0.5rem;
+        color: white;
+        transition: all 0.3s;
+    }
+    .form-control:focus {
+        outline: none;
+        ring: 2px;
+        ring-color: rgb(59, 130, 246);
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+    select.form-control option {
+        background-color: rgb(30, 41, 59);
+        color: white;
+    }
+</style>
+{% endblock %}

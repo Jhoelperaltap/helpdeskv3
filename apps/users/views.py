@@ -1,11 +1,12 @@
-from django.views.generic import TemplateView, CreateView, ListView
+from django.views.generic import TemplateView, CreateView, ListView, UpdateView, FormView
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from .forms import RegisterForm, AdminUserCreateForm
+from django.db.models import Q
+from .forms import RegisterForm, AdminUserCreateForm, AdminUserEditForm, AdminPasswordChangeForm, UserPasswordChangeForm
 from .models import User
 from apps.companies.models import Company
 from apps.notifications.utils import notify_user_created
@@ -120,4 +121,105 @@ class AdminUserListView(SuperAdminRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        return User.objects.select_related('company').order_by('-date_joined')
+        queryset = User.objects.select_related('company').order_by('-date_joined')
+        
+        search_query = self.request.GET.get('search', '')
+        if search_query:
+            queryset = queryset.filter(
+                Q(username__icontains=search_query) |
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query) |
+                Q(email__icontains=search_query) |
+                Q(company__name__icontains=search_query)
+            )
+        
+        role_filter = self.request.GET.get('role', '')
+        if role_filter:
+            queryset = queryset.filter(role=role_filter)
+        
+        company_filter = self.request.GET.get('company', '')
+        if company_filter:
+            queryset = queryset.filter(company_id=company_filter)
+        
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['search_query'] = self.request.GET.get('search', '')
+        context['role_filter'] = self.request.GET.get('role', '')
+        context['company_filter'] = self.request.GET.get('company', '')
+        context['roles'] = User.ROLES
+        context['companies'] = Company.objects.all()
+        return context
+
+class AdminUserEditView(SuperAdminRequiredMixin, UpdateView):
+    """Admin-only view to edit existing users"""
+    model = User
+    form_class = AdminUserEditForm
+    template_name = 'users/admin_edit_user.html'
+    success_url = reverse_lazy('users:admin_user_list')
+    
+    def form_valid(self, form):
+        user = form.save()
+        messages.success(
+            self.request,
+            f'Usuario {user.username} actualizado exitosamente.'
+        )
+        return redirect(self.success_url)
+
+class AdminPasswordChangeView(SuperAdminRequiredMixin, FormView):
+    """Admin-only view to change user passwords"""
+    form_class = AdminPasswordChangeForm
+    template_name = 'users/admin_change_password.html'
+    success_url = reverse_lazy('users:admin_user_list')
+    
+    def dispatch(self, request, *args, **kwargs):
+        self.user_to_change = get_object_or_404(User, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['user_to_change'] = self.user_to_change
+        return context
+    
+    def form_valid(self, form):
+        new_password = form.cleaned_data['new_password1']
+        self.user_to_change.set_password(new_password)
+        self.user_to_change.save()
+        
+        messages.success(
+            self.request,
+            f'Contraseña de {self.user_to_change.username} cambiada exitosamente.'
+        )
+        return redirect(self.success_url)
+
+class UserProfileView(LoginRequiredMixin, TemplateView):
+    """Vista de perfil del usuario autenticado"""
+    template_name = 'users/user_profile.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['user'] = self.request.user
+        return context
+
+class UserPasswordChangeView(LoginRequiredMixin, FormView):
+    """Vista para que los usuarios cambien su propia contraseña"""
+    form_class = UserPasswordChangeForm
+    template_name = 'users/user_change_password.html'
+    success_url = reverse_lazy('users:user_profile')
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def form_valid(self, form):
+        form.save()
+        messages.success(
+            self.request,
+            'Tu contraseña ha sido cambiada exitosamente. Por favor, inicia sesión nuevamente.'
+        )
+        # Logout user after password change for security
+        from django.contrib.auth import logout
+        logout(self.request)
+        return redirect('users:login')
