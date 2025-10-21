@@ -97,13 +97,14 @@ class AdminUserCreateView(SuperAdminRequiredMixin, CreateView):
     model = User
     
     def form_valid(self, form):
-        temp_password = generate_temporary_password()
-        user = form.save(commit=False)
-        user.set_password(temp_password)
-        user.save()
+        # El UserCreationForm ya hashea la contraseña correctamente en su método save()
+        user = form.save(commit=True)
         
-        # Send welcome email with temporary password
-        notify_user_created(user, temp_password, self.request.user)
+        # Get the password from the form before it's hashed (for the email)
+        password = form.cleaned_data.get('password1')
+        
+        # Send welcome email with the password they set
+        notify_user_created(user, password, self.request.user)
         
         messages.success(
             self.request, 

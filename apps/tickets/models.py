@@ -134,7 +134,7 @@ class EscalationSettings(models.Model):
     business_hours_only = models.BooleanField(default=True, help_text="Solo escalar en horario laboral")
     business_start_hour = models.IntegerField(default=9, help_text="Hora de inicio del horario laboral (0-23)")
     business_end_hour = models.IntegerField(default=17, help_text="Hora de fin del horario laboral (0-23)")
-    business_days = models.CharField(max_length=20, default="1,2,3,4,5", help_text="Días laborales (1=Lunes, 7=Domingo)")
+    business_days = models.CharField(max_length=50, default="1,2,3,4,5", help_text="Días laborales (1=Lunes, 7=Domingo)")
     max_escalation_level = models.IntegerField(default=3, help_text="Nivel máximo de escalamiento")
     auto_assign_on_escalation = models.BooleanField(default=True, help_text="Asignar automáticamente al escalar")
     pause_on_response = models.BooleanField(default=True, help_text="Pausar escalamiento cuando hay respuesta")
