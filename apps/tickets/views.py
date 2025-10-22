@@ -315,10 +315,16 @@ def ticket_close(request, pk):
     if not (user.is_technician() or user.is_superadmin()):
         raise PermissionDenied("No tienes permisos para cerrar tickets.")
     
-    if ticket.status != 'CLOSED':
-        was_resolved = ticket.status == 'RESOLVED'
+    close_as_resolved = request.POST.get('resolved') == 'true'
+    
+    if ticket.status not in ['CLOSED', 'RESOLVED']:
+        if close_as_resolved:
+            ticket.status = 'RESOLVED'
+            status_text = "resuelto"
+        else:
+            ticket.status = 'CLOSED'
+            status_text = "cerrado"
         
-        ticket.status = 'CLOSED'
         ticket.escalation_paused = True
         ticket.next_escalation_at = None
         ticket.save()
@@ -327,18 +333,18 @@ def ticket_close(request, pk):
         TicketMessage.objects.create(
             ticket=ticket,
             sender=user,
-            content=f"Ticket cerrado por {user.get_full_name() or user.username}",
+            content=f"Ticket {status_text} por {user.get_full_name() or user.username}",
             private=True
         )
         
-        if was_resolved:
+        if close_as_resolved:
             notify_ticket_resolved(ticket, user)
         else:
             notify_ticket_updated(ticket, user)
         
-        messages.success(request, f'Ticket {ticket.reference} cerrado exitosamente.')
+        messages.success(request, f'Ticket {ticket.reference} {status_text} exitosamente.')
     else:
-        messages.info(request, 'El ticket ya estaba cerrado.')
+        messages.info(request, 'El ticket ya estaba cerrado o resuelto.')
     
     return redirect(ticket.get_absolute_url())
 

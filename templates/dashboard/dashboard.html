@@ -171,6 +171,19 @@
 <script>
 let statusChart, priorityChart, trendChart;
 
+const statusLabels = {
+  'OPEN': 'Abierto',
+  'IN_PROGRESS': 'En Progreso',
+  'RESOLVED': 'Resuelto',
+  'CLOSED': 'Cerrado'
+};
+
+const priorityLabels = {
+  'LOW': 'Baja',
+  'MEDIUM': 'Media',
+  'HIGH': 'Alta'
+};
+
 // Initialize charts
 function initCharts() {
   // Status Chart
@@ -180,7 +193,7 @@ function initCharts() {
   statusChart = new Chart(statusCtx, {
     type: 'doughnut',
     data: {
-      labels: byStatus.map(x => x.status),
+      labels: byStatus.map(x => statusLabels[x.status] || x.status),
       datasets: [{
         data: byStatus.map(x => x.count),
         backgroundColor: [
@@ -209,7 +222,7 @@ function initCharts() {
   priorityChart = new Chart(priorityCtx, {
     type: 'bar',
     data: {
-      labels: byPriority.map(x => x.priority),
+      labels: byPriority.map(x => priorityLabels[x.priority] || x.priority),
       datasets: [{
         label: 'Tickets',
         data: byPriority.map(x => x.count),
@@ -257,11 +270,12 @@ function initCharts() {
   });
 }
 
-// Apply filters function
 function applyFilters() {
   const companyId = document.getElementById('companyFilter')?.value || '';
   const dateFrom = document.getElementById('dateFrom').value;
   const dateTo = document.getElementById('dateTo').value;
+  
+  console.log('[v0] Aplicando filtros:', { companyId, dateFrom, dateTo });
   
   const params = new URLSearchParams();
   if (companyId) params.append('company_id', companyId);
@@ -269,24 +283,102 @@ function applyFilters() {
   if (dateTo) params.append('date_to', dateTo);
   
   fetch(`/dashboard/api/data/?${params}`)
-    .then(response => response.json())
-    .then(data => {
-      // Update stats
-      document.getElementById('totalTickets').textContent = data.total_tickets;
-      document.getElementById('openTickets').textContent = data.open_tickets;
-      document.getElementById('inProgressTickets').textContent = data.in_progress_tickets;
-      document.getElementById('resolvedTickets').textContent = data.resolved_tickets;
+    .then(response => {
+      console.log('[v0] Response status:', response.status);
       
-      // Update charts
-      statusChart.data.labels = data.by_status.map(x => x.status);
-      statusChart.data.datasets[0].data = data.by_status.map(x => x.count);
-      statusChart.update();
-      
-      priorityChart.data.labels = data.by_priority.map(x => x.priority);
-      priorityChart.data.datasets[0].data = data.by_priority.map(x => x.count);
-      priorityChart.update();
+      // Intentar parsear como JSON sin importar el status
+      return response.json().then(data => {
+        console.log('[v0] Datos parseados:', data);
+        
+        // Si el servidor devolvió un error explícito
+        if (data.success === false) {
+          throw new Error(data.message || data.error || 'Error del servidor');
+        }
+        
+        // Si el status HTTP no es OK pero el JSON se parseó
+        if (!response.ok) {
+          throw new Error(`Error HTTP ${response.status}: ${data.message || 'Error desconocido'}`);
+        }
+        
+        return data;
+      }).catch(parseError => {
+        // Si falla el parseo de JSON
+        console.error('[v0] Error parseando JSON:', parseError);
+        throw new Error('Error al procesar la respuesta del servidor');
+      });
     })
-    .catch(error => console.error('Error:', error));
+    .then(data => {
+      console.log('[v0] Actualizando dashboard con datos:', data);
+      
+      // Update stats - con valores por defecto
+      document.getElementById('totalTickets').textContent = data.total_tickets ?? 0;
+      document.getElementById('openTickets').textContent = data.open_tickets ?? 0;
+      document.getElementById('inProgressTickets').textContent = data.in_progress_tickets ?? 0;
+      document.getElementById('resolvedTickets').textContent = data.resolved_tickets ?? 0;
+      
+      // Update status chart
+      if (data.by_status && data.by_status.length > 0) {
+        statusChart.data.labels = data.by_status.map(x => statusLabels[x.status] || x.status);
+        statusChart.data.datasets[0].data = data.by_status.map(x => x.count);
+        statusChart.update();
+      }
+      
+      // Update priority chart
+      if (data.by_priority && data.by_priority.length > 0) {
+        priorityChart.data.labels = data.by_priority.map(x => priorityLabels[x.priority] || x.priority);
+        priorityChart.data.datasets[0].data = data.by_priority.map(x => x.count);
+        priorityChart.update();
+      }
+      
+      // Update trend chart
+      if (data.daily_tickets && data.daily_tickets.length > 0) {
+        trendChart.data.labels = data.daily_tickets.map(x => new Date(x.date).toLocaleDateString());
+        trendChart.data.datasets[0].data = data.daily_tickets.map(x => x.count);
+        trendChart.update();
+      }
+      
+      // Update technician table
+      if (data.technician_stats) {
+        updateTechnicianTable(data.technician_stats);
+      }
+      
+      console.log('[v0] Dashboard actualizado exitosamente');
+    })
+    .catch(error => {
+      console.error('[v0] Error:', error);
+      alert('Error al aplicar filtros. Por favor, intenta de nuevo.\n\nDetalle: ' + error.message);
+    });
+}
+
+function updateTechnicianTable(techStats) {
+  const tbody = document.querySelector('table tbody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  
+  if (!techStats || techStats.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No hay técnicos disponibles</td></tr>';
+    return;
+  }
+  
+  techStats.forEach(tech => {
+    const row = `
+      <tr class="border-b border-gray-100 hover:bg-gray-50">
+        <td class="py-3 px-4">${tech.name}</td>
+        <td class="py-3 px-4">${tech.total_assigned}</td>
+        <td class="py-3 px-4">${tech.resolved}</td>
+        <td class="py-3 px-4">
+          <div class="flex items-center">
+            <div class="w-16 bg-gray-200 rounded-full h-2 mr-3">
+              <div class="bg-green-500 h-2 rounded-full" style="width: ${tech.resolution_rate}%"></div>
+            </div>
+            <span class="text-sm font-medium">${tech.resolution_rate}%</span>
+          </div>
+        </td>
+      </tr>
+    `;
+    tbody.innerHTML += row;
+  });
 }
 
 // Export report function
