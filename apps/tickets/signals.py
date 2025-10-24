@@ -344,6 +344,172 @@ def handle_message_added_escalation(sender, instance, created, **kwargs):
         except Exception as e:
             logger.error(f'Error pausando escalamiento por mensaje: {str(e)}')
 
+@receiver(post_save, sender=TicketMessage)
+def send_message_notification(sender, instance, created, **kwargs):
+    """
+    Envía notificación por email cuando se agrega un mensaje a un ticket
+    """
+    if created and not instance.private:  # Solo para mensajes públicos
+        try:
+            # Enviar notificación en un thread separado para no bloquear
+            thread = threading.Thread(
+                target=send_message_notification_async,
+                args=(
+                    instance.id,
+                    instance.ticket.id,
+                    instance.ticket.reference,
+                    instance.ticket.title,
+                    instance.content,
+                    instance.sender.get_full_name() or instance.sender.username,
+                    instance.sender.email,
+                    instance.created_at.strftime('%d/%m/%Y %H:%M'),
+                ),
+                daemon=True
+            )
+            thread.start()
+            
+            logger.info(f'Notificación de mensaje programada para ticket {instance.ticket.reference}')
+            
+        except Exception as e:
+            logger.error(f'Error programando notificación de mensaje: {str(e)}')
+
+def send_message_notification_async(message_id, ticket_id, ticket_reference, ticket_title, 
+                                    message_content, sender_name, sender_email, created_at):
+    """
+    Envía notificación de nuevo mensaje de forma asíncrona
+    Notifica al creador del ticket y al técnico asignado (si existe)
+    """
+    try:
+        from .models import Ticket, TicketMessage
+        
+        # Obtener el ticket y mensaje completos
+        ticket = Ticket.objects.select_related('created_by', 'assigned_to', 'company').get(id=ticket_id)
+        message = TicketMessage.objects.select_related('sender').get(id=message_id)
+        
+        # Configuración SMTP desde .env
+        smtp_host = os.environ.get('EMAIL_HOST', settings.EMAIL_HOST)
+        smtp_port = int(os.environ.get('EMAIL_PORT', settings.EMAIL_PORT))
+        smtp_user = os.environ.get('EMAIL_HOST_USER', settings.EMAIL_HOST_USER)
+        smtp_password = os.environ.get('EMAIL_HOST_PASSWORD', settings.EMAIL_HOST_PASSWORD)
+        from_email = os.environ.get('DEFAULT_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
+        
+        # Verificar configuración
+        if not smtp_user or not smtp_password:
+            raise ValueError('Configuración SMTP incompleta')
+        
+        # Determinar si usar SSL o TLS basado en el puerto
+        use_ssl = smtp_port == 465
+        use_tls = smtp_port == 587
+        
+        # Crear conexión SMTP reutilizable
+        connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=smtp_host,
+            port=smtp_port,
+            username=smtp_user,
+            password=smtp_password,
+            use_ssl=use_ssl,
+            use_tls=use_tls,
+            timeout=60,
+        )
+        
+        # Lista de destinatarios (evitar duplicados y no enviar al remitente del mensaje)
+        recipients = set()
+        
+        # Agregar creador del ticket si no es el remitente del mensaje
+        if ticket.created_by and ticket.created_by.email and ticket.created_by.id != message.sender.id:
+            recipients.add((ticket.created_by.email, ticket.created_by.get_full_name() or ticket.created_by.username))
+        
+        # Agregar técnico asignado si existe y no es el remitente
+        if ticket.assigned_to and ticket.assigned_to.email and ticket.assigned_to.id != message.sender.id:
+            recipients.add((ticket.assigned_to.email, ticket.assigned_to.get_full_name() or ticket.assigned_to.username))
+        
+        # Enviar email a cada destinatario
+        for recipient_email, recipient_name in recipients:
+            email_log = EmailLog.objects.create(
+                email_type='ticket_notification',
+                recipient=recipient_email,
+                subject=f'[Helpdesk] Nuevo mensaje en ticket #{ticket_reference}',
+                status='sending',
+                smtp_host=smtp_host,
+                smtp_port=smtp_port
+            )
+            
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Nuevo Mensaje en Ticket</title>
+                <style>
+                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
+                    .container {{ max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                    .header {{ background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; padding: 30px 20px; text-align: center; }}
+                    .content {{ padding: 30px; }}
+                    .message-box {{ background: #faf5ff; border: 1px solid #e9d5ff; border-left: 4px solid #8b5cf6; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+                    .ticket-info {{ background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0; }}
+                    .footer {{ background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; }}
+                    .message-icon {{ font-size: 48px; margin-bottom: 10px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="message-icon">💬</div>
+                        <h1>Nuevo Mensaje en Ticket</h1>
+                        <p>Hay una nueva respuesta en tu ticket</p>
+                    </div>
+                    <div class="content">
+                        <p>Hola <strong>{recipient_name}</strong>,</p>
+                        <p>Se ha agregado un nuevo mensaje al ticket <strong>#{ticket_reference}</strong>.</p>
+                        
+                        <div class="ticket-info">
+                            <p style="margin: 5px 0;"><strong>Ticket:</strong> #{ticket_reference} - {ticket_title}</p>
+                            <p style="margin: 5px 0;"><strong>Empresa:</strong> {ticket.company.name}</p>
+                        </div>
+                        
+                        <div class="message-box">
+                            <p style="margin: 0 0 10px 0;"><strong>Mensaje de {sender_name}:</strong></p>
+                            <p style="margin: 0; color: #6b7280; white-space: pre-wrap;">{message_content}</p>
+                            <p style="margin: 10px 0 0 0; font-size: 12px; color: #9ca3af;">{created_at}</p>
+                        </div>
+                        
+                        <p style="margin-top: 20px;">Accede al sistema de helpdesk para ver el ticket completo y responder.</p>
+                    </div>
+                    <div class="footer">
+                        <p><strong>Sistema Helpdesk</strong></p>
+                        <p style="font-size: 12px;">Este es un email automático, no responder.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            
+            try:
+                email = EmailMessage(
+                    subject=f'[Helpdesk] Nuevo mensaje en ticket #{ticket_reference}',
+                    body=html_content,
+                    from_email=from_email,
+                    to=[recipient_email],
+                    connection=connection,
+                )
+                email.content_subtype = 'html'
+                email.send()
+                
+                email_log.status = 'sent'
+                email_log.sent_at = timezone.now()
+                email_log.save()
+                
+                logger.info(f'Notificación de mensaje enviada a {recipient_email} para ticket {ticket_reference}')
+            except Exception as e:
+                email_log.status = 'failed'
+                email_log.error_message = str(e)
+                email_log.save()
+                logger.error(f'Error enviando notificación de mensaje a {recipient_email}: {str(e)}')
+        
+    except Exception as e:
+        logger.error(f'Error crítico en envío asíncrono de notificación de mensaje: {str(e)}')
+
 def get_escalation_settings(company):
     """Obtiene la configuración de escalamiento para una empresa"""
     try:
