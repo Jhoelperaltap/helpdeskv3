@@ -50,6 +50,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',  # Added for i18n language detection
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -71,6 +72,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.i18n',  # Added for i18n support
             ],
         },
     },
@@ -124,10 +126,21 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es'  # Default language
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
+
+# Supported languages
+LANGUAGES = [
+    ('es', 'Español'),
+    ('en', 'English'),
+]
+
+# Translation files location
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 
 LOGIN_URL = '/users/login/'
 LOGIN_REDIRECT_URL = '/users/home/'
