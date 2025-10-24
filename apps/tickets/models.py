@@ -1,26 +1,40 @@
 from django.db import models
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from apps.companies.models import Company
 import json
 
 class Ticket(models.Model):
-    STATUS = [('OPEN','Abierto'),('IN_PROGRESS','En Progreso'),('RESOLVED','Resuelto'),('CLOSED','Cerrado')]
-    PRIORITY = [('LOW','Baja'),('MEDIUM','Media'),('HIGH','Alta')]
+    STATUS = [
+        ('OPEN', _('Abierto')),
+        ('IN_PROGRESS', _('En Progreso')),
+        ('RESOLVED', _('Resuelto')),
+        ('CLOSED', _('Cerrado'))
+    ]
+    PRIORITY = [
+        ('LOW', _('Baja')),
+        ('MEDIUM', _('Media')),
+        ('HIGH', _('Alta'))
+    ]
 
-    reference = models.CharField(max_length=20, unique=True)
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    status = models.CharField(max_length=20, choices=STATUS, default='OPEN')
-    priority = models.CharField(max_length=10, choices=PRIORITY, default='MEDIUM')
-    company = models.ForeignKey(Company, related_name='tickets', on_delete=models.CASCADE)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='created_tickets', on_delete=models.SET_NULL, null=True)
-    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='assigned_tickets', on_delete=models.SET_NULL, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    last_response_at = models.DateTimeField(null=True, blank=True, help_text="Última vez que se respondió al ticket")
-    escalation_level = models.IntegerField(default=0, help_text="Nivel de escalamiento actual (0=sin escalar)")
-    next_escalation_at = models.DateTimeField(null=True, blank=True, help_text="Próxima fecha de escalamiento")
-    escalation_paused = models.BooleanField(default=False, help_text="Si el escalamiento está pausado")
+    reference = models.CharField(max_length=20, unique=True, verbose_name=_('Referencia'))
+    title = models.CharField(max_length=255, verbose_name=_('Título'))
+    description = models.TextField(verbose_name=_('Descripción'))
+    status = models.CharField(max_length=20, choices=STATUS, default='OPEN', verbose_name=_('Estado'))
+    priority = models.CharField(max_length=10, choices=PRIORITY, default='MEDIUM', verbose_name=_('Prioridad'))
+    company = models.ForeignKey(Company, related_name='tickets', on_delete=models.CASCADE, verbose_name=_('Compañía'))
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='created_tickets', on_delete=models.SET_NULL, null=True, verbose_name=_('Creado por'))
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='assigned_tickets', on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_('Asignado a'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Creado en'))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_('Actualizado en'))
+    last_response_at = models.DateTimeField(null=True, blank=True, verbose_name=_('Última respuesta'), help_text=_("Última vez que se respondió al ticket"))
+    escalation_level = models.IntegerField(default=0, verbose_name=_('Nivel de escalamiento'), help_text=_("Nivel de escalamiento actual (0=sin escalar)"))
+    next_escalation_at = models.DateTimeField(null=True, blank=True, verbose_name=_('Próximo escalamiento'), help_text=_("Próxima fecha de escalamiento"))
+    escalation_paused = models.BooleanField(default=False, verbose_name=_('Escalamiento pausado'), help_text=_("Si el escalamiento está pausado"))
+
+    class Meta:
+        verbose_name = _('Ticket')
+        verbose_name_plural = _('Tickets')
 
     def __str__(self):
         return f"{self.reference} - {self.title}"
@@ -30,24 +44,30 @@ class Ticket(models.Model):
         return reverse('tickets:ticket_detail', args=[self.pk])
 
 class TicketMessage(models.Model):
-    ticket = models.ForeignKey(Ticket, related_name='messages', on_delete=models.CASCADE)
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='messages', on_delete=models.SET_NULL, null=True)
-    content = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    private = models.BooleanField(default=False)
+    ticket = models.ForeignKey(Ticket, related_name='messages', on_delete=models.CASCADE, verbose_name=_('Ticket'))
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='messages', on_delete=models.SET_NULL, null=True, verbose_name=_('Remitente'))
+    content = models.TextField(verbose_name=_('Contenido'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Creado en'))
+    private = models.BooleanField(default=False, verbose_name=_('Privado'))
 
     class Meta:
         ordering = ('created_at',)
+        verbose_name = _('Mensaje de Ticket')
+        verbose_name_plural = _('Mensajes de Ticket')
 
 class TicketAttachment(models.Model):
-    ticket = models.ForeignKey(Ticket, related_name='attachments', on_delete=models.CASCADE)
-    message = models.ForeignKey(TicketMessage, related_name='attachments', on_delete=models.CASCADE, null=True, blank=True)
-    file = models.FileField(upload_to='ticket_attachments/')
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+    ticket = models.ForeignKey(Ticket, related_name='attachments', on_delete=models.CASCADE, verbose_name=_('Ticket'))
+    message = models.ForeignKey(TicketMessage, related_name='attachments', on_delete=models.CASCADE, null=True, blank=True, verbose_name=_('Mensaje'))
+    file = models.FileField(upload_to='ticket_attachments/', verbose_name=_('Archivo'))
+    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Subido en'))
+
+    class Meta:
+        verbose_name = _('Adjunto de Ticket')
+        verbose_name_plural = _('Adjuntos de Ticket')
 
 class SavedFilter(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='saved_filters', on_delete=models.CASCADE)
-    name = models.CharField(max_length=100, help_text="Nombre descriptivo del filtro")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='saved_filters', on_delete=models.CASCADE, verbose_name=_('Usuario'))
+    name = models.CharField(max_length=100, verbose_name=_('Nombre'), help_text=_("Nombre descriptivo del filtro"))
     filter_data = models.JSONField(help_text="Datos del filtro en formato JSON")
     is_default = models.BooleanField(default=False, help_text="Si es el filtro por defecto del usuario")
     created_at = models.DateTimeField(auto_now_add=True)

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Helpdesk 3.01\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-24 23:19+0000\n"
+"POT-Creation-Date: 2025-10-24 23:22+0000\n"
 "PO-Revision-Date: 2025-10-24 23:19+0000\n"
 "Last-Translator: Helpdesk Team\n"
 "Language-Team: English\n"
@@ -16,6 +16,167 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: apps/tickets/models.py:9
+msgid "Abierto"
+msgstr "Open"
+
+#: apps/tickets/models.py:10
+msgid "En Progreso"
+msgstr "In Progress"
+
+#: apps/tickets/models.py:11
+msgid "Resuelto"
+msgstr "Resolved"
+
+#: apps/tickets/models.py:12
+msgid "Cerrado"
+msgstr "Closed"
+
+#: apps/tickets/models.py:15
+msgid "Baja"
+msgstr "Low"
+
+#: apps/tickets/models.py:16
+msgid "Media"
+msgstr "Medium"
+
+#: apps/tickets/models.py:17
+msgid "Alta"
+msgstr "High"
+
+#: apps/tickets/models.py:20
+msgid "Referencia"
+msgstr "Reference"
+
+#: apps/tickets/models.py:21
+msgid "Título"
+msgstr "Title"
+
+#: apps/tickets/models.py:22
+msgid "Descripción"
+msgstr "Description"
+
+#: apps/tickets/models.py:23
+msgid "Estado"
+msgstr "Status"
+
+#: apps/tickets/models.py:24
+msgid "Prioridad"
+msgstr "Priority"
+
+#: apps/tickets/models.py:25
+msgid "Compañía"
+msgstr "Company"
+
+#: apps/tickets/models.py:26
+msgid "Creado por"
+msgstr "Created by"
+
+#: apps/tickets/models.py:27
+msgid "Asignado a"
+msgstr "Assigned to"
+
+#: apps/tickets/models.py:28 apps/tickets/models.py:50
+msgid "Creado en"
+msgstr "Created at"
+
+#: apps/tickets/models.py:29
+msgid "Actualizado en"
+msgstr "Updated at"
+
+#: apps/tickets/models.py:30
+msgid "Última respuesta"
+msgstr "Last response"
+
+#: apps/tickets/models.py:30
+msgid "Última vez que se respondió al ticket"
+msgstr "Last time the ticket was responded to"
+
+#: apps/tickets/models.py:31
+msgid "Nivel de escalamiento"
+msgstr "Escalation"
+
+#: apps/tickets/models.py:31
+msgid "Nivel de escalamiento actual (0=sin escalar)"
+msgstr "Current escalation level (0=not escalated)"
+
+#: apps/tickets/models.py:32
+msgid "Próximo escalamiento"
+msgstr "Escalation"
+
+#: apps/tickets/models.py:32
+msgid "Próxima fecha de escalamiento"
+msgstr "Next escalation date"
+
+#: apps/tickets/models.py:33
+msgid "Escalamiento pausado"
+msgstr "Escalation"
+
+#: apps/tickets/models.py:33
+msgid "Si el escalamiento está pausado"
+msgstr "Whether escalation is paused"
+
+#: apps/tickets/models.py:36 apps/tickets/models.py:47
+#: apps/tickets/models.py:59
+msgid "Ticket"
+msgstr "Tickets"
+
+#: apps/tickets/models.py:37 templates/base.html:58 templates/base.html:196
+msgid "Tickets"
+msgstr "Tickets"
+
+#: apps/tickets/models.py:48
+msgid "Remitente"
+msgstr "Sender"
+
+#: apps/tickets/models.py:49
+msgid "Contenido"
+msgstr "Content"
+
+#: apps/tickets/models.py:51
+msgid "Privado"
+msgstr "Private"
+
+#: apps/tickets/models.py:55
+msgid "Mensaje de Ticket"
+msgstr "Create Ticket"
+
+#: apps/tickets/models.py:56
+msgid "Mensajes de Ticket"
+msgstr "Create Ticket"
+
+#: apps/tickets/models.py:60
+msgid "Mensaje"
+msgstr "Message"
+
+#: apps/tickets/models.py:61
+msgid "Archivo"
+msgstr "File"
+
+#: apps/tickets/models.py:62
+msgid "Subido en"
+msgstr "Uploaded at"
+
+#: apps/tickets/models.py:65
+msgid "Adjunto de Ticket"
+msgstr "Ticket Attachment"
+
+#: apps/tickets/models.py:66
+msgid "Adjuntos de Ticket"
+msgstr "Ticket Attachments"
+
+#: apps/tickets/models.py:69
+msgid "Usuario"
+msgstr "Create User"
+
+#: apps/tickets/models.py:70
+msgid "Nombre"
+msgstr "Name"
+
+#: apps/tickets/models.py:70
+msgid "Nombre descriptivo del filtro"
+msgstr "Descriptive filter name"
+
 #: templates/base.html:7
 msgid "Helpdesk v3.01"
 msgstr "Helpdesk v3.01"
@@ -23,10 +184,6 @@ msgstr "Helpdesk v3.01"
 #: templates/base.html:54 templates/base.html:192
 msgid "Dashboard"
 msgstr "Dashboard"
-
-#: templates/base.html:58 templates/base.html:196
-msgid "Tickets"
-msgstr "Tickets"
 
 #: templates/base.html:62 templates/base.html:200
 msgid "Notificaciones"
