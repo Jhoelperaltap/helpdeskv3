@@ -40,11 +40,14 @@ class InternationalizationTestCase(TestCase):
     
     def test_language_switching_url_exists(self):
         """Test that the language switching URL is configured"""
+        from django.urls.exceptions import NoReverseMatch
+        
         try:
             url = reverse('set_language')
             self.assertIsNotNone(url)
-        except Exception as e:
-            self.fail(f"Language switching URL not found: {e}")
+            self.assertTrue(url.startswith('/i18n/'))
+        except NoReverseMatch:
+            self.fail("Language switching URL 'set_language' not found in URL configuration")
     
     @override_settings(LANGUAGE_CODE='es')
     def test_spanish_translation(self):
@@ -52,9 +55,9 @@ class InternationalizationTestCase(TestCase):
         with translation.override('es'):
             from django.utils.translation import gettext as _
             
-            # Test some basic translations
+            # Test translations from English msgids
             self.assertEqual(_('Dashboard'), 'Panel de Control')
-            self.assertEqual(_('Notificaciones'), 'Notificaciones')
+            self.assertEqual(_('Tickets'), 'Tickets')
     
     @override_settings(LANGUAGE_CODE='en')
     def test_english_translation(self):
@@ -62,9 +65,9 @@ class InternationalizationTestCase(TestCase):
         with translation.override('en'):
             from django.utils.translation import gettext as _
             
-            # Test some basic translations
-            self.assertEqual(_('Dashboard'), 'Dashboard')
+            # Test translations from Spanish msgids to English
             self.assertEqual(_('Notificaciones'), 'Notifications')
+            self.assertEqual(_('Administración'), 'Administration')
     
     def test_ticket_model_translations(self):
         """Test that Ticket model has translatable fields"""
