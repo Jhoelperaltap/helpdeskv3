@@ -350,6 +350,37 @@ def ticket_close(request, pk):
 
 @login_required
 @require_POST
+def ticket_set_in_progress(request, pk):
+    ticket = get_object_or_404(Ticket, pk=pk)
+    user = request.user
+    
+    # Only technicians and superadmins can set tickets to in progress
+    if not (user.is_technician() or user.is_superadmin()):
+        raise PermissionDenied("No tienes permisos para cambiar el estado de tickets.")
+    
+    if ticket.status == 'OPEN':
+        ticket.status = 'IN_PROGRESS'
+        ticket.last_response_at = timezone.now()
+        ticket.save()
+        
+        # Add a system message
+        TicketMessage.objects.create(
+            ticket=ticket,
+            sender=user,
+            content=f"Ticket puesto en progreso por {user.get_full_name() or user.username}",
+            private=True
+        )
+        
+        notify_ticket_updated(ticket, user)
+        
+        messages.success(request, f'Ticket {ticket.reference} puesto en progreso exitosamente.')
+    else:
+        messages.info(request, f'El ticket está en estado {ticket.get_status_display()}.')
+    
+    return redirect(ticket.get_absolute_url())
+
+@login_required
+@require_POST
 def ticket_reopen(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk)
     user = request.user

@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     TicketListView, TicketDetailView, TicketCreateView, TicketEditView, 
-    ticket_close, ticket_reopen, save_filter, load_filter, delete_filter, clear_filters,
+    ticket_close, ticket_reopen, ticket_set_in_progress, save_filter, load_filter, delete_filter, clear_filters,
     pause_escalation, resume_escalation_view, escalation_history
 )
 from .admin_views import (
@@ -21,6 +21,7 @@ urlpatterns = [
     path('<int:pk>/edit/', TicketEditView.as_view(), name='ticket_edit'),
     path('<int:pk>/close/', ticket_close, name='ticket_close'),
     path('<int:pk>/reopen/', ticket_reopen, name='ticket_reopen'),
+    path('<int:pk>/set-in-progress/', ticket_set_in_progress, name='ticket_set_in_progress'),
     path('filters/save/', save_filter, name='save_filter'),
     path('filters/load/<int:filter_id>/', load_filter, name='load_filter'),
     path('filters/delete/<int:filter_id>/', delete_filter, name='delete_filter'),

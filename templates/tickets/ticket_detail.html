@@ -152,6 +152,16 @@
           </a>
         {% endif %}
         {% if request.user.is_technician or request.user.is_superadmin %}
+          {% if object.status == 'OPEN' %}
+            <form method="post" action="{% url 'tickets:ticket_set_in_progress' object.pk %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="px-4 py-2 bg-gradient-to-r from-blue-100 to-indigo-200 hover:from-blue-200 hover:to-indigo-300 text-blue-800 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+                <i class="fas fa-play-circle mr-2"></i>
+                Poner en Progreso
+              </button>
+            </form>
+          {% endif %}
+          
           {% if object.status != 'CLOSED' and object.status != 'RESOLVED' %}
             <button type="button" onclick="openCloseModal()" class="px-4 py-2 bg-gradient-to-r from-red-100 to-pink-200 hover:from-red-200 hover:to-pink-300 text-red-800 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
               <i class="fas fa-times-circle mr-2"></i>
