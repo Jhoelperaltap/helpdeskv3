@@ -33,6 +33,8 @@ class TicketListView(LoginRequiredMixin, FilterView):
     login_url = '/users/login/'
     filterset_class = TicketFilter
     paginate_by = 20
+    # Valores permitidos para items por página
+    paginate_options = [10, 20, 50, 100]
     
     def get_queryset(self):
         user = self.request.user
@@ -57,6 +59,26 @@ class TicketListView(LoginRequiredMixin, FilterView):
         kwargs = super().get_filterset_kwargs(filterset_class)
         kwargs['request'] = self.request
         return kwargs
+
+    def get_paginate_by(self, queryset):
+        """Permitir cambiar el tamaño de página con ?per_page=<n> (validado).
+
+        Si el parámetro no es válido o no está presente, usar el valor por defecto
+        definido en `paginate_by`.
+        """
+        per_page = self.request.GET.get('per_page')
+        if not per_page:
+            return self.paginate_by
+
+        try:
+            per_page_val = int(per_page)
+        except (TypeError, ValueError):
+            return self.paginate_by
+
+        if per_page_val in self.paginate_options:
+            return per_page_val
+
+        return self.paginate_by
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
